@@ -13,8 +13,8 @@ from aiosocks import (
 )
 
 async def connect():
-  socks5_serv = Socks5Addr('127.0.0.1', 1080)
-  socks4_serv = Socks4Addr('127.0.0.1', 1080)
+  socks5_addr = Socks5Addr('127.0.0.1', 1080)
+  socks4_addr = Socks4Addr('127.0.0.1', 1080)
   
   socks5_auth = Socks5Auth('login', 'pwd')
   socks4_auth = Socks4Auth('ident')
@@ -23,15 +23,15 @@ async def connect():
   
   # socks5 connect
   transport, protocol = await create_connection(
-      lambda: Protocol, proxy=socks5_serv, proxy_auth=socks5_auth, dst=dst)
+      lambda: Protocol, proxy=socks5_addr, proxy_auth=socks5_auth, dst=dst)
   
   # socks4 connect
   transport, protocol = await create_connection(
-      lambda: Protocol, proxy=socks4_serv, proxy_auth=socks4_auth, dst=dst)
+      lambda: Protocol, proxy=socks4_addr, proxy_auth=socks4_auth, dst=dst)
       
   # socks4 without auth and local domain name resolving
   transport, protocol = await create_connection(
-      lambda: Protocol, proxy=socks4_serv, proxy_auth=None, dst=dst, remote_resolve=False)
+      lambda: Protocol, proxy=socks4_addr, proxy_auth=None, dst=dst, remote_resolve=False)
 
 
 if __name__ == '__main__':
@@ -48,10 +48,10 @@ from aiosocks import Socks5Addr, Socks5Auth
 from aiosocks.connector import SocksConnector
 
 async def load_github_main():
-  serv = Socks5Addr('127.0.0.1', 1080)
+  addr = Socks5Addr('127.0.0.1', 1080)
   auth = Socks5Auth('proxyuser1', password='pwd')
   
-  conn = SocksConnector(proxy=serv, proxy_auth=auth, remote_resolve=False)
+  conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=False)
   
   with aiohttp.ClientSession(connector=conn) as ses:
     async with session.get('http://github.com/') as resp:
