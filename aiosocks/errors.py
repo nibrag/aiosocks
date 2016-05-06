@@ -16,3 +16,7 @@ class InvalidServerVersion(SocksError):
 
 class InvalidServerReply(SocksError):
     pass
+
+
+class SocksConnectionError(OSError):
+    pass

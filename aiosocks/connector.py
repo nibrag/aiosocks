@@ -1,4 +1,9 @@
+import socket
+
 import aiohttp
+import ipaddress
+from aiohttp.errors import ProxyConnectionError
+from .errors import SocksError, SocksConnectionError
 from . import create_connection
 
 __all__ = ('SocksConnector',)
@@ -46,9 +51,14 @@ class SocksConnector(aiohttp.TCPConnector):
                     proto=hinfo['proto'], flags=hinfo['flags'], local_addr=self._local_addr)
 
                 return transp, proto
-            except OSError as e:
+            except (OSError, SocksError, SocksConnectionError) as e:
                 exc = e
         else:
-            raise aiohttp.ClientOSError(exc.errno,
-                                        'Can not connect to %s:%s [%s]' %
-                                        (req.host, req.port, exc.strerror)) from exc
+            if isinstance(exc, SocksConnectionError):
+                raise ProxyConnectionError(*exc.args)
+            if isinstance(exc, SocksError):
+                raise exc
+            else:
+                raise aiohttp.ClientOSError(exc.errno,
+                                            'Can not connect to %s:%s [%s]' %
+                                            (req.host, req.port, exc.strerror)) from exc

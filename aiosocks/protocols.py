@@ -106,7 +106,7 @@ class Socks4Protocol(SocksProtocol):
             raise InvalidServerReply('SOCKS4 proxy server sent invalid data')
         if resp[1] != c.SOCKS4_GRANTED:
             error = c.SOCKS4_ERRORS.get(resp[1], 'Unknown error')
-            raise SocksError('{0:#04x}: {1}'.format(resp[1], error))
+            raise SocksError('[Errno {0:#04x}]: {1}'.format(resp[1], error))
 
         binded = socket.inet_ntoa(resp[4:]), struct.unpack('>H', resp[2:4])[0]
         return (host, port), binded
@@ -138,7 +138,7 @@ class Socks5Protocol(SocksProtocol):
         chosen_auth = await self.read_response(2)
 
         if chosen_auth[0] != c.SOCKS_VER5:
-            raise InvalidServerVersion
+            raise InvalidServerVersion('SOCKS5 proxy server sent invalid version')
 
         if chosen_auth[1] == c.SOCKS5_AUTH_UNAME_PWD:
             req = [0x01, chr(len(self._auth.login)).encode(), self._auth.login,
@@ -149,11 +149,11 @@ class Socks5Protocol(SocksProtocol):
             if auth_status[0] != 0x01:
                 raise InvalidServerReply('SOCKS5 proxy server sent invalid data')
             if auth_status[1] != c.SOCKS5_GRANTED:
-                raise LoginAuthenticationFailed
+                raise LoginAuthenticationFailed('SOCKS5 authentication failed')
         # offered auth methods rejected
         elif chosen_auth[1] != c.SOCKS5_AUTH_ANONYMOUS:
             if chosen_auth[1] == c.SOCKS5_AUTH_NO_ACCEPTABLE_METHODS:
-                raise NoAcceptableAuthMethods
+                raise NoAcceptableAuthMethods('All offered SOCKS5 authentication methods were rejected')
             else:
                 raise InvalidServerReply('SOCKS5 proxy server sent invalid data')
 
@@ -165,10 +165,10 @@ class Socks5Protocol(SocksProtocol):
         resp = await self.read_response(3)
 
         if resp[0] != c.SOCKS_VER5:
-            raise InvalidServerVersion
+            raise InvalidServerVersion('SOCKS5 proxy server sent invalid version')
         if resp[1] != c.SOCKS5_GRANTED:
             error = c.SOCKS5_ERRORS.get(resp[1], 'Unknown error')
-            raise SocksError('{0:#04x}: {1}'.format(resp[1], error))
+            raise SocksError('[Errno {0:#04x}]: {1}'.format(resp[1], error))
 
         binded = await self.read_address()
 

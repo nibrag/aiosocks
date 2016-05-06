@@ -7,7 +7,7 @@ __version__ = '0.1.1'
 
 __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
-           'NoAcceptableAuthMethods', 'LoginAuthenticationFailed',
+           'NoAcceptableAuthMethods', 'LoginAuthenticationFailed', 'SocksConnectionError',
            'InvalidServerVersion', 'InvalidServerReply', 'create_connection')
 
 
@@ -46,11 +46,19 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *, remote_
             proxy=proxy, proxy_auth=proxy_auth, dst=dst,
             remote_resolve=remote_resolve, loop=loop)
 
-    transport, protocol = await loop.create_connection(
-        socks_factory, proxy.host, proxy.port, ssl=ssl, family=family, proto=proto,
-        flags=flags, sock=sock, local_addr=local_addr, server_hostname=server_hostname)
+    try:
+        transport, protocol = await loop.create_connection(
+            socks_factory, proxy.host, proxy.port, ssl=ssl, family=family, proto=proto,
+            flags=flags, sock=sock, local_addr=local_addr, server_hostname=server_hostname)
+    except OSError as exc:
+        raise SocksConnectionError('[Errno %s] Can not connect to proxy %s:%d [%s]' %
+                                   (exc.errno, proxy.host, proxy.port, exc.strerror)) from exc
 
-    await protocol.negotiate_done()
+    try:
+        await protocol.negotiate_done()
+    except SocksError as exc:
+        raise SocksError('Can not connect to %s:%s [%s]' %
+                         (dst[0], dst[1], exc))
 
     sock = transport.get_extra_info('socket')
 
