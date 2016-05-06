@@ -3,7 +3,7 @@ import socket
 import struct
 from . import constants as c
 from .helpers import (
-    Socks4Server, Socks5Server, Socks5Auth, Socks4Auth
+    Socks4Addr, Socks5Addr, Socks5Auth, Socks4Auth
 )
 from .errors import *
 
@@ -67,7 +67,7 @@ class SocksProtocol(asyncio.StreamReaderProtocol):
 
 class Socks4Protocol(SocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
-        if not isinstance(proxy, Socks4Server):
+        if not isinstance(proxy, Socks4Addr):
             raise ValueError('Invalid proxy format')
 
         if proxy_auth is not None and not isinstance(proxy_auth, Socks4Auth):
@@ -111,7 +111,7 @@ class Socks4Protocol(SocksProtocol):
 
 class Socks5Protocol(SocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
-        if not isinstance(proxy, Socks5Server):
+        if not isinstance(proxy, Socks5Addr):
             raise ValueError('Invalid proxy format')
 
         if proxy_auth is not None and not isinstance(proxy_auth, Socks5Auth):
