@@ -25,7 +25,7 @@ class Socks5Auth(namedtuple('Socks5Auth', ['login', 'password', 'encoding'])):
 
 
 class SocksAddr(namedtuple('SocksServer', ['host', 'port'])):
-    def __new__(cls, host, port):
+    def __new__(cls, host, port=1080):
         if host is None:
             raise ValueError('None is not allowed as host value')
 
