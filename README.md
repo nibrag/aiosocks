@@ -18,18 +18,20 @@ async def connect():
   
   socks5_auth = Socks5Auth('login', 'pwd')
   socks4_auth = Socks4Auth('ident')
+
+  dst = ('github.com', 80)
   
   # socks5 connect
   transport, protocol = await create_connection(
-      lambda: Protocol, proxy=socks5_serv, proxy_auth=socks5_auth, remote_resolve=True)
+      lambda: Protocol, proxy=socks5_serv, proxy_auth=socks5_auth, dst=dst)
   
   # socks4 connect
   transport, protocol = await create_connection(
-      lambda: Protocol, proxy=socks4_serv, proxy_auth=socks4_auth, remote_resolve=True)
+      lambda: Protocol, proxy=socks4_serv, proxy_auth=socks4_auth, dst=dst)
       
   # socks4 without auth and local domain name resolving
   transport, protocol = await create_connection(
-      lambda: Protocol, proxy=socks4_serv, proxy_auth=None, remote_resolve=False)
+      lambda: Protocol, proxy=socks4_serv, proxy_auth=None, dst=dst, remote_resolve=False)
 
 
 if __name__ == '__main__':
