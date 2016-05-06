@@ -75,6 +75,9 @@ class Socks4Protocol(SocksProtocol):
 
         super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
 
+        if proxy_auth is None:
+            self._auth = Socks4Auth('')
+
     async def socks_request(self, cmd):
         # prepare destination addr/port
         host, port = self._dst_host, self._dst_port
@@ -118,6 +121,9 @@ class Socks5Protocol(SocksProtocol):
             raise ValueError('Invalid proxy_auth format')
 
         super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
+
+        if proxy_auth is None:
+            self._auth = Socks5Auth('', '')
 
     async def socks_request(self, cmd):
         # send available auth methods
