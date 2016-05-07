@@ -3,7 +3,7 @@ from .errors import *
 from .helpers import *
 from .protocols import Socks4Protocol, Socks5Protocol
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
@@ -66,4 +66,3 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *, remote_
     transport._protocol = protocol
 
     return transport, protocol
-
