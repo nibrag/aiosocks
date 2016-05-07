@@ -70,10 +70,10 @@ aiohttp usage
     with aiohttp.ClientSession(connector=conn) as ses:
       async with session.get('http://github.com/') as resp:
         if resp.status == 200:
-          return await resp.text()
+          print(await resp.text())
   
   
   if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    loop.run_until_complete()
+    loop.run_until_complete(load_github_main())
     loop.close()
