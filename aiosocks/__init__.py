@@ -54,13 +54,16 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *, remote_
         raise SocksConnectionError('[Errno %s] Can not connect to proxy %s:%d [%s]' %
                                    (exc.errno, proxy.host, proxy.port, exc.strerror)) from exc
 
+    # Wait until communication with proxy server is finished
     try:
         await protocol.negotiate_done()
     except SocksError as exc:
         raise SocksError('Can not connect to %s:%s [%s]' %
                          (dst[0], dst[1], exc))
 
-    sock = transport.get_extra_info('socket')
+    protocol = protocol_factory()
+    protocol.connection_made(transport)
+    transport._protocol = protocol
 
-    return await loop._create_connection_transport(
-        sock, protocol_factory, ssl, server_hostname)
+    return transport, protocol
+
