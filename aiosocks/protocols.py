@@ -20,7 +20,6 @@ class SocksProtocol(asyncio.StreamReaderProtocol):
 
         self._loop = loop or asyncio.get_event_loop()
         self._transport = None
-
         self._negotiate_done = None
 
         reader = asyncio.StreamReader(loop=self._loop)
@@ -61,22 +60,21 @@ class SocksProtocol(asyncio.StreamReaderProtocol):
             raise OSError('getaddrinfo() returned empty list')
         return infos[0][0], infos[0][4][0]
 
-    async def negotiate_done(self):
-        return await self._negotiate_done
+    def negotiate_done(self):
+        return self._negotiate_done
 
 
 class Socks4Protocol(SocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
+        proxy_auth = proxy_auth or Socks4Auth('')
+
         if not isinstance(proxy, Socks4Addr):
             raise ValueError('Invalid proxy format')
 
-        if proxy_auth is not None and not isinstance(proxy_auth, Socks4Auth):
+        if not isinstance(proxy_auth, Socks4Auth):
             raise ValueError('Invalid proxy_auth format')
 
         super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
-
-        if proxy_auth is None:
-            self._auth = Socks4Auth('')
 
     async def socks_request(self, cmd):
         # prepare destination addr/port
@@ -114,16 +112,15 @@ class Socks4Protocol(SocksProtocol):
 
 class Socks5Protocol(SocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
+        proxy_auth = proxy_auth or Socks5Auth('', '')
+
         if not isinstance(proxy, Socks5Addr):
             raise ValueError('Invalid proxy format')
 
-        if proxy_auth is not None and not isinstance(proxy_auth, Socks5Auth):
+        if not isinstance(proxy_auth, Socks5Auth):
             raise ValueError('Invalid proxy_auth format')
 
         super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
-
-        if proxy_auth is None:
-            self._auth = Socks5Auth('', '')
 
     async def socks_request(self, cmd):
         # send available auth methods
