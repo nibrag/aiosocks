@@ -1,8 +1,14 @@
 # aiosocks
-SOCKS proxy client for asyncio and aiohttp
+SOCKS proxy client for asyncio and aiohttp (python 3.5+)
 
-# Requirement
-python 3.5+
+# Features
+- SOCKS4, SOCKS4a and SOCKS5 version
+- SocksConnector for aiohttp
+- SOCKS "CONNECT" command
+
+# TODO
+- UDP associate
+- TCP port binding
 
 # Usage
 ### direct usage
