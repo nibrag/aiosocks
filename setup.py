@@ -32,6 +32,6 @@ setup(
         url='https://github.com/nibrag/aiosocks',
 
         description='SOCKS proxy client for asyncio and aiohttp',
-        long_description=open("README.md").read(),
+        long_description=open("README.rst").read(),
         packages=['aiosocks']
 )
