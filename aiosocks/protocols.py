@@ -126,6 +126,26 @@ class Socks5Protocol(BaseSocksProtocol):
         super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
 
     async def socks_request(self, cmd):
+        await self.authenticate()
+
+        # build and send command
+        self.write_request([c.SOCKS_VER5, cmd, c.RSV])
+        resolved = await self.write_address(self._dst_host, self._dst_port)
+
+        # read/process command response
+        resp = await self.read_response(3)
+
+        if resp[0] != c.SOCKS_VER5:
+            raise InvalidServerVersion('SOCKS5 proxy server sent invalid version')
+        if resp[1] != c.SOCKS5_GRANTED:
+            error = c.SOCKS5_ERRORS.get(resp[1], 'Unknown error')
+            raise SocksError('[Errno {0:#04x}]: {1}'.format(resp[1], error))
+
+        binded = await self.read_address()
+
+        return resolved, binded
+
+    async def authenticate(self):
         # send available auth methods
         if self._auth.login and self._auth.password:
             req = [c.SOCKS_VER5, 0x02, c.SOCKS5_AUTH_ANONYMOUS, c.SOCKS5_AUTH_UNAME_PWD]
@@ -156,23 +176,6 @@ class Socks5Protocol(BaseSocksProtocol):
                 raise NoAcceptableAuthMethods('All offered SOCKS5 authentication methods were rejected')
             else:
                 raise InvalidServerReply('SOCKS5 proxy server sent invalid data')
-
-        # build and send command
-        self.write_request([c.SOCKS_VER5, cmd, c.RSV])
-        resolved = await self.write_address(self._dst_host, self._dst_port)
-
-        # read/process command response
-        resp = await self.read_response(3)
-
-        if resp[0] != c.SOCKS_VER5:
-            raise InvalidServerVersion('SOCKS5 proxy server sent invalid version')
-        if resp[1] != c.SOCKS5_GRANTED:
-            error = c.SOCKS5_ERRORS.get(resp[1], 'Unknown error')
-            raise SocksError('[Errno {0:#04x}]: {1}'.format(resp[1], error))
-
-        binded = await self.read_address()
-
-        return resolved, binded
 
     async def write_address(self, host, port):
         family_to_byte = {socket.AF_INET: c.SOCKS5_ATYP_IPv4, socket.AF_INET6: c.SOCKS5_ATYP_IPv6}
