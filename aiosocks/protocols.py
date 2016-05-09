@@ -8,7 +8,7 @@ from .helpers import (
 from .errors import *
 
 
-class SocksProtocol(asyncio.StreamReaderProtocol):
+class BaseSocksProtocol(asyncio.StreamReaderProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
         if not isinstance(dst, (tuple, list)) or len(dst) != 2:
             raise ValueError('Invalid dst format, tuple("dst_host", dst_port))')
@@ -64,7 +64,7 @@ class SocksProtocol(asyncio.StreamReaderProtocol):
         return self._negotiate_done
 
 
-class Socks4Protocol(SocksProtocol):
+class Socks4Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
         proxy_auth = proxy_auth or Socks4Auth('')
 
@@ -113,7 +113,7 @@ class Socks4Protocol(SocksProtocol):
         return (host, port), binded
 
 
-class Socks5Protocol(SocksProtocol):
+class Socks5Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
         proxy_auth = proxy_auth or Socks5Auth('', '')
 
