@@ -61,8 +61,9 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *, remote_
         raise SocksError('Can not connect to %s:%s [%s]' %
                          (dst[0], dst[1], exc))
 
-    protocol = protocol_factory()
-    protocol.connection_made(transport)
-    transport._protocol = protocol
+    if protocol_factory:
+        protocol = protocol_factory()
+        protocol.connection_made(transport)
+        transport._protocol = protocol
 
     return transport, protocol
