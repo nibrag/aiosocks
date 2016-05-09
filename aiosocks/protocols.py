@@ -80,11 +80,14 @@ class Socks4Protocol(SocksProtocol):
         # prepare destination addr/port
         host, port = self._dst_host, self._dst_port
         port_bytes = struct.pack(b'>H', port)
+        include_hostname = False
+
         try:
             host_bytes = socket.inet_aton(host)
         except socket.error:
             if self._remote_resolve:
                 host_bytes = bytes([c.NULL, c.NULL, c.NULL, 0x01])
+                include_hostname = True
             else:
                 # it's not an IP number, so it's probably a DNS name.
                 family, host = await self._get_dst_addr()
@@ -92,7 +95,7 @@ class Socks4Protocol(SocksProtocol):
 
         # build and send connect command
         req = [c.SOCKS_VER4, cmd, port_bytes, host_bytes, self._auth.login, c.NULL]
-        if self._remote_resolve:
+        if include_hostname:
             req += [self._dst_host.encode('idna'), c.NULL]
 
         self.write_request(req)
