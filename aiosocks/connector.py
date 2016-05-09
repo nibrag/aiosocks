@@ -59,7 +59,7 @@ class SocksConnector(aiohttp.TCPConnector):
                 proxy = self._proxy.__class__(host=hinfo['host'], port=hinfo['port'])
 
                 transp, proto = await create_connection(
-                    self._factory, proxy, self._proxy_auth, dst,
+                    self._factory, proxy, self._proxy_auth, dst, loop=self._loop,
                     remote_resolve=self._remote_resolve, ssl=None, family=hinfo['family'],
                     proto=hinfo['proto'], flags=hinfo['flags'], local_addr=self._local_addr)
 
