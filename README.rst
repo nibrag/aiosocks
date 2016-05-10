@@ -1,5 +1,8 @@
 SOCKS proxy client for asyncio and aiohttp
 ==========================================
+.. image:: https://travis-ci.org/nibrag/aiosocks.svg?branch=master
+  :target:  https://travis-ci.org/nibrag/aiosocks
+  :align: right
 
 Features
 --------
