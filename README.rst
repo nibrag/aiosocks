@@ -10,7 +10,6 @@ SOCKS proxy client for asyncio and aiohttp
 
 .. image:: https://badge.fury.io/py/aiosocks.svg
   :target: https://badge.fury.io/py/aiosocks
-  :align: right
 
 Features
 --------
