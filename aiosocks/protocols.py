@@ -5,7 +5,10 @@ from . import constants as c
 from .helpers import (
     Socks4Addr, Socks5Addr, Socks5Auth, Socks4Auth
 )
-from .errors import *  # noqa
+from .errors import (
+    SocksError, NoAcceptableAuthMethods, LoginAuthenticationFailed,
+    InvalidServerReply, InvalidServerVersion
+)
 
 
 class BaseSocksProtocol(asyncio.StreamReaderProtocol):

@@ -1,6 +1,11 @@
 import asyncio
-from .errors import *  # noqa
-from .helpers import *  # noqa
+from .errors import (
+    SocksError, NoAcceptableAuthMethods, LoginAuthenticationFailed,
+    SocksConnectionError, InvalidServerReply, InvalidServerVersion
+)
+from .helpers import (
+    SocksAddr, Socks4Addr, Socks5Addr, Socks4Auth, Socks5Auth
+)
 from .protocols import Socks4Protocol, Socks5Protocol
 
 __version__ = '0.1.2'
