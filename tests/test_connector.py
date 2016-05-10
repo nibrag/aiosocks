@@ -41,7 +41,9 @@ class TestSocksConnector(unittest.TestCase):
 
         self.assertTrue(loop_mock.getaddrinfo.is_called)
         self.assertIs(conn._transport, tr)
-        self.assertTrue(isinstance(conn._protocol, aiohttp.parsers.StreamProtocol))
+        self.assertTrue(
+            isinstance(conn._protocol, aiohttp.parsers.StreamProtocol)
+        )
 
         conn.close()
 
@@ -63,7 +65,9 @@ class TestSocksConnector(unittest.TestCase):
         self.assertTrue(connector._resolve_host.is_called)
         self.assertEqual(connector._resolve_host.call_count, 1)
         self.assertIs(conn._transport, tr)
-        self.assertTrue(isinstance(conn._protocol, aiohttp.parsers.StreamProtocol))
+        self.assertTrue(
+            isinstance(conn._protocol, aiohttp.parsers.StreamProtocol)
+        )
 
         conn.close()
 
@@ -85,7 +89,9 @@ class TestSocksConnector(unittest.TestCase):
         self.assertTrue(connector._resolve_host.is_called)
         self.assertEqual(connector._resolve_host.call_count, 2)
         self.assertIs(conn._transport, tr)
-        self.assertTrue(isinstance(conn._protocol, aiohttp.parsers.StreamProtocol))
+        self.assertTrue(
+            isinstance(conn._protocol, aiohttp.parsers.StreamProtocol)
+        )
 
         conn.close()
 

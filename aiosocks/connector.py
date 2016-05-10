@@ -10,8 +10,8 @@ __all__ = ('SocksConnector',)
 
 
 class SocksConnector(aiohttp.TCPConnector):
-    def __init__(self, proxy, proxy_auth=None, *, remote_resolve=True, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, proxy, proxy_auth=None, *, remote_resolve=True, **kwgs):
+        super().__init__(**kwgs)
 
         self._proxy = proxy
         self._proxy_auth = proxy_auth
@@ -44,7 +44,8 @@ class SocksConnector(aiohttp.TCPConnector):
         # It's aiohttp bug? Hot fix:
         try:
             ipaddress.ip_address(self._proxy.host)
-            proxy_hosts = await self._loop.getaddrinfo(self._proxy.host, self._proxy.port)
+            proxy_hosts = await self._loop.getaddrinfo(self._proxy.host,
+                                                       self._proxy.port)
             family, _, proto, _, address = proxy_hosts[0]
 
             proxy_hosts = ({'hostname': self._proxy.host,
@@ -52,16 +53,19 @@ class SocksConnector(aiohttp.TCPConnector):
                             'family': family, 'proto': proto,
                             'flags': socket.AI_NUMERICHOST},)
         except ValueError:
-            proxy_hosts = await self._resolve_host(self._proxy.host, self._proxy.port)
+            proxy_hosts = await self._resolve_host(self._proxy.host,
+                                                   self._proxy.port)
 
         for hinfo in proxy_hosts:
             try:
-                proxy = self._proxy.__class__(host=hinfo['host'], port=hinfo['port'])
+                proxy = self._proxy.__class__(host=hinfo['host'],
+                                              port=hinfo['port'])
 
                 transp, proto = await create_connection(
-                    self._factory, proxy, self._proxy_auth, dst, loop=self._loop,
-                    remote_resolve=self._remote_resolve, ssl=None, family=hinfo['family'],
-                    proto=hinfo['proto'], flags=hinfo['flags'], local_addr=self._local_addr)
+                    self._factory, proxy, self._proxy_auth, dst,
+                    loop=self._loop, remote_resolve=self._remote_resolve,
+                    ssl=None, family=hinfo['family'], proto=hinfo['proto'],
+                    flags=hinfo['flags'], local_addr=self._local_addr)
 
                 return transp, proto
             except (OSError, SocksError, SocksConnectionError) as e:
@@ -72,6 +76,6 @@ class SocksConnector(aiohttp.TCPConnector):
             if isinstance(exc, SocksError):
                 raise exc
             else:
-                raise aiohttp.ClientOSError(exc.errno,
-                                            'Can not connect to %s:%s [%s]' %
-                                            (req.host, req.port, exc.strerror)) from exc
+                raise aiohttp.ClientOSError(
+                    exc.errno, 'Can not connect to %s:%s [%s]' %
+                    (req.host, req.port, exc.strerror)) from exc

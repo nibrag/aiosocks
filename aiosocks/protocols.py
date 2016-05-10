@@ -5,13 +5,15 @@ from . import constants as c
 from .helpers import (
     Socks4Addr, Socks5Addr, Socks5Auth, Socks4Auth
 )
-from .errors import *
+from .errors import *  # noqa
 
 
 class BaseSocksProtocol(asyncio.StreamReaderProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
         if not isinstance(dst, (tuple, list)) or len(dst) != 2:
-            raise ValueError('Invalid dst format, tuple("dst_host", dst_port))')
+            raise ValueError(
+                'Invalid dst format, tuple("dst_host", dst_port))'
+            )
 
         self._proxy = proxy
         self._auth = proxy_auth
@@ -53,9 +55,10 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         return await self._stream_reader.read(n)
 
     async def _get_dst_addr(self):
-        infos = await self._loop.getaddrinfo(self._dst_host, self._dst_port,
-                                             family=socket.AF_UNSPEC, type=socket.SOCK_STREAM,
-                                             proto=socket.IPPROTO_TCP, flags=socket.AI_ADDRCONFIG)
+        infos = await self._loop.getaddrinfo(
+            self._dst_host, self._dst_port, family=socket.AF_UNSPEC,
+            type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP,
+            flags=socket.AI_ADDRCONFIG)
         if not infos:
             raise OSError('getaddrinfo() returned empty list')
         return infos[0][0], infos[0][4][0]
@@ -94,7 +97,8 @@ class Socks4Protocol(BaseSocksProtocol):
                 host_bytes = socket.inet_aton(host)
 
         # build and send connect command
-        req = [c.SOCKS_VER4, cmd, port_bytes, host_bytes, self._auth.login, c.NULL]
+        req = [c.SOCKS_VER4, cmd, port_bytes,
+               host_bytes, self._auth.login, c.NULL]
         if include_hostname:
             req += [self._dst_host.encode('idna'), c.NULL]
 
@@ -136,7 +140,9 @@ class Socks5Protocol(BaseSocksProtocol):
         resp = await self.read_response(3)
 
         if resp[0] != c.SOCKS_VER5:
-            raise InvalidServerVersion('SOCKS5 proxy server sent invalid version')
+            raise InvalidServerVersion(
+                'SOCKS5 proxy server sent invalid version'
+            )
         if resp[1] != c.SOCKS5_GRANTED:
             error = c.SOCKS5_ERRORS.get(resp[1], 'Unknown error')
             raise SocksError('[Errno {0:#04x}]: {1}'.format(resp[1], error))
@@ -148,7 +154,8 @@ class Socks5Protocol(BaseSocksProtocol):
     async def authenticate(self):
         # send available auth methods
         if self._auth.login and self._auth.password:
-            req = [c.SOCKS_VER5, 0x02, c.SOCKS5_AUTH_ANONYMOUS, c.SOCKS5_AUTH_UNAME_PWD]
+            req = [c.SOCKS_VER5, 0x02,
+                   c.SOCKS5_AUTH_ANONYMOUS, c.SOCKS5_AUTH_UNAME_PWD]
         else:
             req = [c.SOCKS_VER5, 0x01, c.SOCKS5_AUTH_ANONYMOUS]
 
@@ -158,7 +165,9 @@ class Socks5Protocol(BaseSocksProtocol):
         chosen_auth = await self.read_response(2)
 
         if chosen_auth[0] != c.SOCKS_VER5:
-            raise InvalidServerVersion('SOCKS5 proxy server sent invalid version')
+            raise InvalidServerVersion(
+                'SOCKS5 proxy server sent invalid version'
+            )
 
         if chosen_auth[1] == c.SOCKS5_AUTH_UNAME_PWD:
             req = [0x01, chr(len(self._auth.login)).encode(), self._auth.login,
@@ -167,18 +176,27 @@ class Socks5Protocol(BaseSocksProtocol):
 
             auth_status = await self.read_response(2)
             if auth_status[0] != 0x01:
-                raise InvalidServerReply('SOCKS5 proxy server sent invalid data')
+                raise InvalidServerReply(
+                    'SOCKS5 proxy server sent invalid data'
+                )
             if auth_status[1] != c.SOCKS5_GRANTED:
-                raise LoginAuthenticationFailed('SOCKS5 authentication failed')
+                raise LoginAuthenticationFailed(
+                    "SOCKS5 authentication failed"
+                )
         # offered auth methods rejected
         elif chosen_auth[1] != c.SOCKS5_AUTH_ANONYMOUS:
             if chosen_auth[1] == c.SOCKS5_AUTH_NO_ACCEPTABLE_METHODS:
-                raise NoAcceptableAuthMethods('All offered SOCKS5 authentication methods were rejected')
+                raise NoAcceptableAuthMethods(
+                    'All offered SOCKS5 authentication methods were rejected'
+                )
             else:
-                raise InvalidServerReply('SOCKS5 proxy server sent invalid data')
+                raise InvalidServerReply(
+                    'SOCKS5 proxy server sent invalid data'
+                )
 
     async def write_address(self, host, port):
-        family_to_byte = {socket.AF_INET: c.SOCKS5_ATYP_IPv4, socket.AF_INET6: c.SOCKS5_ATYP_IPv6}
+        family_to_byte = {socket.AF_INET: c.SOCKS5_ATYP_IPv4,
+                          socket.AF_INET6: c.SOCKS5_ATYP_IPv6}
         port_bytes = struct.pack('>H', port)
 
         # if the given destination address is an IP address, we will
@@ -195,7 +213,8 @@ class Socks5Protocol(BaseSocksProtocol):
         # it's not an IP number, so it's probably a DNS name.
         if self._remote_resolve:
             host_bytes = host.encode('idna')
-            req = [c.SOCKS5_ATYP_DOMAIN, chr(len(host_bytes)).encode(), host_bytes, port_bytes]
+            req = [c.SOCKS5_ATYP_DOMAIN, chr(len(host_bytes)).encode(),
+                   host_bytes, port_bytes]
         else:
             family, host_bytes = await self._get_dst_addr()
             host_bytes = socket.inet_pton(family, host_bytes)

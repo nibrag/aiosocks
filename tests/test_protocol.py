@@ -67,7 +67,8 @@ class TestBaseSocksProtocol(unittest.TestCase):
             BaseSocksProtocol(None, None, ('python.org',), loop=self.loop)
 
     def test_write_request(self):
-        proto = BaseSocksProtocol(None, None, ('python.org', 80), loop=self.loop)
+        proto = BaseSocksProtocol(None, None, ('python.org', 80),
+                                  loop=self.loop)
         proto._transport = mock.Mock()
 
         proto.write_request([b'\x00', b'\x01\x02', 0x03])
@@ -97,10 +98,12 @@ class TestSocks4Protocol(unittest.TestCase):
             aiosocks.Socks4Protocol(None, auth, dst, loop=self.loop)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks4Protocol(aiosocks.Socks5Addr('host'), auth, dst, loop=self.loop)
+            aiosocks.Socks4Protocol(aiosocks.Socks5Addr('host'), auth, dst,
+                                    loop=self.loop)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks4Protocol(addr, aiosocks.Socks5Auth('l', 'p'), dst, loop=self.loop)
+            aiosocks.Socks4Protocol(addr, aiosocks.Socks5Auth('l', 'p'), dst,
+                                    loop=self.loop)
 
         aiosocks.Socks4Protocol(addr, None, dst, loop=self.loop)
         aiosocks.Socks4Protocol(addr, auth, dst, loop=self.loop)
@@ -119,7 +122,8 @@ class TestSocks4Protocol(unittest.TestCase):
         )
 
         # dst = domain, remote resolve = false
-        proto = make_socks4(self.loop, dst=('python.org', 80), rr=False, r=resp)
+        proto = make_socks4(self.loop, dst=('python.org', 80),
+                            rr=False, r=resp)
 
         req = proto.socks_request(c.SOCKS_CMD_CONNECT)
         self.loop.run_until_complete(req)
@@ -138,7 +142,8 @@ class TestSocks4Protocol(unittest.TestCase):
         )
 
         # dst = ip, remote resolve = false
-        proto = make_socks4(self.loop, dst=('127.0.0.1', 8800), rr=False, r=resp)
+        proto = make_socks4(self.loop, dst=('127.0.0.1', 8800),
+                            rr=False, r=resp)
         req = proto.socks_request(c.SOCKS_CMD_CONNECT)
         self.loop.run_until_complete(req)
 
@@ -147,8 +152,8 @@ class TestSocks4Protocol(unittest.TestCase):
         )
 
         # dst = domain, without user
-        proto = make_socks4(
-            self.loop, auth=aiosocks.Socks4Auth(''), dst=('python.org', 80), r=resp)
+        proto = make_socks4(self.loop, auth=aiosocks.Socks4Auth(''),
+                            dst=('python.org', 80), r=resp)
         req = proto.socks_request(c.SOCKS_CMD_CONNECT)
         self.loop.run_until_complete(req)
 
@@ -157,8 +162,8 @@ class TestSocks4Protocol(unittest.TestCase):
         )
 
         # dst = ip, without user
-        proto = make_socks4(
-            self.loop, auth=aiosocks.Socks4Auth(''), dst=('127.0.0.1', 8800), r=resp)
+        proto = make_socks4(self.loop, auth=aiosocks.Socks4Auth(''),
+                            dst=('127.0.0.1', 8800), r=resp)
         req = proto.socks_request(c.SOCKS_CMD_CONNECT)
         self.loop.run_until_complete(req)
 
@@ -226,10 +231,12 @@ class TestSocks5Protocol(unittest.TestCase):
             aiosocks.Socks5Protocol(None, auth, dst, loop=self.loop)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks5Protocol(aiosocks.Socks4Addr('host'), auth, dst, loop=self.loop)
+            aiosocks.Socks5Protocol(aiosocks.Socks4Addr('host'),
+                                    auth, dst, loop=self.loop)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks5Protocol(addr, aiosocks.Socks4Auth('l'), dst, loop=self.loop)
+            aiosocks.Socks5Protocol(addr, aiosocks.Socks4Auth('l'),
+                                    dst, loop=self.loop)
 
         aiosocks.Socks5Protocol(addr, None, dst, loop=self.loop)
         aiosocks.Socks5Protocol(addr, auth, dst, loop=self.loop)
@@ -264,8 +271,10 @@ class TestSocks5Protocol(unittest.TestCase):
         proto = make_socks5(self.loop, r=(b'\x05\x02', b'\x01\x00',))
         req = proto.authenticate()
         self.loop.run_until_complete(req)
-        proto._transport.write.assert_has_calls(
-            [mock.call(b'\x05\x02\x00\x02'), mock.call(b'\x01\x04user\x03pwd')])
+        proto._transport.write.assert_has_calls([
+            mock.call(b'\x05\x02\x00\x02'),
+            mock.call(b'\x01\x04user\x03pwd')
+        ])
 
         # invalid reply
         proto = make_socks5(self.loop, r=(b'\x05\x02', b'\x00\x00',))
@@ -289,7 +298,8 @@ class TestSocks5Protocol(unittest.TestCase):
 
         # ipv6
         proto = make_socks5(self.loop)
-        req = proto.write_address('2001:0db8:11a3:09d7:1f34:8a2e:07a0:765d', 80)
+        req = proto.write_address(
+            '2001:0db8:11a3:09d7:1f34:8a2e:07a0:765d', 80)
         self.loop.run_until_complete(req)
 
         proto._transport.write.assert_called_with(
@@ -311,22 +321,29 @@ class TestSocks5Protocol(unittest.TestCase):
 
     def test_read_address(self):
         # ipv4
-        proto = make_socks5(self.loop, r=[b'\x01', b'\x7f\x00\x00\x01', b'\x00P'])
+        proto = make_socks5(
+            self.loop, r=[b'\x01', b'\x7f\x00\x00\x01', b'\x00P'])
         req = asyncio.ensure_future(proto.read_address(), loop=self.loop)
         self.loop.run_until_complete(req)
 
         self.assertEqual(req.result(), ('127.0.0.1', 80))
 
         # ipv6
-        proto = make_socks5(
-            self.loop, r=[b'\x04', b' \x01\r\xb8\x11\xa3\t\xd7\x1f4\x8a.\x07\xa0v]', b'\x00P'])
+        resp = [
+            b'\x04',
+            b' \x01\r\xb8\x11\xa3\t\xd7\x1f4\x8a.\x07\xa0v]',
+            b'\x00P'
+        ]
+        proto = make_socks5(self.loop, r=resp)
         req = asyncio.ensure_future(proto.read_address(), loop=self.loop)
         self.loop.run_until_complete(req)
 
-        self.assertEqual(req.result(), ('2001:db8:11a3:9d7:1f34:8a2e:7a0:765d', 80))
+        self.assertEqual(
+            req.result(), ('2001:db8:11a3:9d7:1f34:8a2e:7a0:765d', 80))
 
         # domain
-        proto = make_socks5(self.loop, r=[b'\x03', b'\n', b'python.org', b'\x00P'])
+        proto = make_socks5(
+            self.loop, r=[b'\x03', b'\n', b'python.org', b'\x00P'])
         req = asyncio.ensure_future(proto.read_address(), loop=self.loop)
         self.loop.run_until_complete(req)
 
@@ -345,7 +362,8 @@ class TestSocks5Protocol(unittest.TestCase):
         with self.assertRaises(aiosocks.SocksError) as ct:
             self.loop.run_until_complete(req)
 
-        self.assertTrue('Connection not allowed by ruleset' in str(ct.exception))
+        self.assertTrue(
+            'Connection not allowed by ruleset' in str(ct.exception))
 
         # socks unknown error
         proto = make_socks5(self.loop, r=[b'\x05\x00', b'\x05\xFF\x00'])
@@ -356,9 +374,13 @@ class TestSocks5Protocol(unittest.TestCase):
         self.assertTrue('Unknown error' in str(ct.exception))
 
         # cmd granted
-        proto = make_socks5(
-            self.loop, r=[b'\x05\x00', b'\x05\x00\x00', b'\x01', b'\x7f\x00\x00\x01', b'\x00P'])
-        req = asyncio.ensure_future(proto.socks_request(c.SOCKS_CMD_CONNECT), loop=self.loop)
+        resp = [b'\x05\x00',
+                b'\x05\x00\x00',
+                b'\x01', b'\x7f\x00\x00\x01',
+                b'\x00P']
+        proto = make_socks5(self.loop, r=resp)
+        req = asyncio.ensure_future(proto.socks_request(c.SOCKS_CMD_CONNECT),
+                                    loop=self.loop)
         self.loop.run_until_complete(req)
 
         self.assertEqual(req.result(), (('python.org', 80), ('127.0.0.1', 80)))
