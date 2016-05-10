@@ -2,3 +2,9 @@ __pycache__/
 *.py[cod]
 *.pyc
 .idea/
+.coverage
+.coverage.*
+*.egg
+*.egg-info
+*.eggs
+*.tar.gz
