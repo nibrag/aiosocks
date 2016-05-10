@@ -7,6 +7,11 @@ from asyncio import coroutine as coro
 import aiosocks.constants as c
 from aiosocks.protocols import BaseSocksProtocol
 
+try:
+    from asyncio import ensure_future
+except ImportError:
+    ensure_future = asyncio.async
+
 
 def make_socks4(loop, *, addr=None, auth=None, rr=True, dst=None, r=b''):
     addr = addr or aiosocks.Socks4Addr('localhost', 1080)
@@ -179,7 +184,7 @@ class TestSocks4Protocol(unittest.TestCase):
 
         # valid result
         proto = make_socks4(self.loop, r=valid_resp)
-        req = asyncio.ensure_future(
+        req = ensure_future(
             proto.socks_request(c.SOCKS_CMD_CONNECT), loop=self.loop)
         self.loop.run_until_complete(req)
 
@@ -323,7 +328,7 @@ class TestSocks5Protocol(unittest.TestCase):
         # ipv4
         proto = make_socks5(
             self.loop, r=[b'\x01', b'\x7f\x00\x00\x01', b'\x00P'])
-        req = asyncio.ensure_future(proto.read_address(), loop=self.loop)
+        req = ensure_future(proto.read_address(), loop=self.loop)
         self.loop.run_until_complete(req)
 
         self.assertEqual(req.result(), ('127.0.0.1', 80))
@@ -335,7 +340,7 @@ class TestSocks5Protocol(unittest.TestCase):
             b'\x00P'
         ]
         proto = make_socks5(self.loop, r=resp)
-        req = asyncio.ensure_future(proto.read_address(), loop=self.loop)
+        req = ensure_future(proto.read_address(), loop=self.loop)
         self.loop.run_until_complete(req)
 
         self.assertEqual(
@@ -344,7 +349,7 @@ class TestSocks5Protocol(unittest.TestCase):
         # domain
         proto = make_socks5(
             self.loop, r=[b'\x03', b'\n', b'python.org', b'\x00P'])
-        req = asyncio.ensure_future(proto.read_address(), loop=self.loop)
+        req = ensure_future(proto.read_address(), loop=self.loop)
         self.loop.run_until_complete(req)
 
         self.assertEqual(req.result(), (b'python.org', 80))
@@ -379,8 +384,8 @@ class TestSocks5Protocol(unittest.TestCase):
                 b'\x01', b'\x7f\x00\x00\x01',
                 b'\x00P']
         proto = make_socks5(self.loop, r=resp)
-        req = asyncio.ensure_future(proto.socks_request(c.SOCKS_CMD_CONNECT),
-                                    loop=self.loop)
+        req = ensure_future(proto.socks_request(c.SOCKS_CMD_CONNECT),
+                            loop=self.loop)
         self.loop.run_until_complete(req)
 
         self.assertEqual(req.result(), (('python.org', 80), ('127.0.0.1', 80)))

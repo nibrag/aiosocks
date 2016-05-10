@@ -10,6 +10,11 @@ from .errors import (
     InvalidServerReply, InvalidServerVersion
 )
 
+try:
+    from asyncio import ensure_future
+except ImportError:
+    ensure_future = asyncio.async
+
 
 class BaseSocksProtocol(asyncio.StreamReaderProtocol):
     def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
@@ -36,7 +41,7 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         self._transport = transport
 
         req_coro = self.socks_request(c.SOCKS_CMD_CONNECT)
-        self._negotiate_done = asyncio.ensure_future(req_coro, loop=self._loop)
+        self._negotiate_done = ensure_future(req_coro, loop=self._loop)
 
     @asyncio.coroutine
     def socks_request(self, cmd):
