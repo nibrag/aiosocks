@@ -1,11 +1,11 @@
 SOCKS proxy client for asyncio and aiohttp
 ==========================================
 .. image:: https://travis-ci.org/nibrag/aiosocks.svg?branch=master
-  :target:  https://travis-ci.org/nibrag/aiosocks
+  :target: https://travis-ci.org/nibrag/aiosocks
   :align: right
 
-.. image:: https://coveralls.io/repos/nibrag/aiosocks/badge.svg?branch=master&service=github
-  :target:  https://coveralls.io/github/nibrag/aiosocks?branch=master
+.. image:: https://coveralls.io/repos/github/nibrag/aiosocks/badge.svg?branch=master
+  :target: https://coveralls.io/github/nibrag/aiosocks?branch=master
   :align: right
 
 Features
