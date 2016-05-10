@@ -20,7 +20,7 @@ with codecs.open(os.path.join(os.path.abspath(os.path.dirname(
 
 
 if sys.version_info < (3, 4, 0):
-    raise RuntimeError("aiosocks requires Python 3.5.1+")
+    raise RuntimeError("aiosocks requires Python 3.4+")
 
 
 setup(
