@@ -8,7 +8,7 @@ from .helpers import (
 )
 from .protocols import Socks4Protocol, Socks5Protocol
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
