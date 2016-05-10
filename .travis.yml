@@ -1,0 +1,41 @@
+sudo: no
+language: python
+
+python:
+  - 3.4
+  - 3.5
+
+os:
+  - linux
+
+cache:
+  directories:
+  - $HOME/.cache/pip
+
+before_cache:
+  - rm -f $HOME/.cache/pip/log/debug.log
+
+install:
+  - pip install --upgrade pip wheel
+  - pip install --upgrade setuptools
+  - pip install pip
+  - pip install flake8
+  - pip install pyflakes==1.1.0
+  - pip install coverage
+  - pip install pytest
+  - pip install pytest-cov
+  - pip install aiodns
+  - pip install aiohttp
+  - pip install coveralls
+
+script:
+  - cd $TRAVIS_BUILD_DIR
+  - flake8 aiosocks tests
+  - python setup.py develop && py.test --cov=aiosocks tests
+  - python setup.py check -rm
+  - if python -c "import sys; sys.exit(sys.version_info < (3,5))"; then
+        python setup.py check -s;
+    fi
+
+after_success:
+  coveralls
