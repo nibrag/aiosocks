@@ -4,6 +4,10 @@ SOCKS proxy client for asyncio and aiohttp
   :target:  https://travis-ci.org/nibrag/aiosocks
   :align: right
 
+.. image:: https://coveralls.io/repos/nibrag/aiosocks/badge.svg?branch=master&service=github
+  :target:  https://coveralls.io/github/nibrag/aiosocks?branch=master
+  :align: right
+
 Features
 --------
 - SOCKS4, SOCKS4a and SOCKS5 version
