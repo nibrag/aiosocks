@@ -13,13 +13,24 @@ except ImportError:
     ensure_future = asyncio.async
 
 
-def make_socks4(loop, *, addr=None, auth=None, rr=True, dst=None, r=b''):
+def make_base(loop, *, dst=None, waiter=None, ap_factory=None, ssl=None):
+    dst = dst or ('python.org', 80)
+
+    proto = BaseSocksProtocol(None, None, dst=dst, ssl=ssl,
+                              loop=loop, waiter=waiter,
+                              app_protocol_factory=ap_factory)
+    return proto
+
+
+def make_socks4(loop, *, addr=None, auth=None, rr=True, dst=None, r=b'',
+                ap_factory=None, whiter=None):
     addr = addr or aiosocks.Socks4Addr('localhost', 1080)
     auth = auth or aiosocks.Socks4Auth('user')
     dst = dst or ('python.org', 80)
 
     proto = aiosocks.Socks4Protocol(
-        proxy=addr, proxy_auth=auth, dst=dst, remote_resolve=rr, loop=loop)
+        proxy=addr, proxy_auth=auth, dst=dst, remote_resolve=rr,
+        loop=loop, app_protocol_factory=ap_factory, waiter=whiter)
     proto._transport = mock.Mock()
     proto.read_response = mock.Mock(
         side_effect=coro(mock.Mock(return_value=r)))
@@ -30,13 +41,15 @@ def make_socks4(loop, *, addr=None, auth=None, rr=True, dst=None, r=b''):
     return proto
 
 
-def make_socks5(loop, *, addr=None, auth=None, rr=True, dst=None, r=None):
+def make_socks5(loop, *, addr=None, auth=None, rr=True, dst=None, r=None,
+                ap_factory=None, whiter=None):
     addr = addr or aiosocks.Socks5Addr('localhost', 1080)
     auth = auth or aiosocks.Socks5Auth('user', 'pwd')
     dst = dst or ('python.org', 80)
 
     proto = aiosocks.Socks5Protocol(
-        proxy=addr, proxy_auth=auth, dst=dst, remote_resolve=rr, loop=loop)
+        proxy=addr, proxy_auth=auth, dst=dst, remote_resolve=rr,
+        loop=loop, app_protocol_factory=ap_factory, waiter=whiter)
     proto._transport = mock.Mock()
 
     if not isinstance(r, (list, tuple)):
@@ -63,17 +76,19 @@ class TestBaseSocksProtocol(unittest.TestCase):
 
     def test_init(self):
         with self.assertRaises(ValueError):
-            BaseSocksProtocol(None, None, None, loop=self.loop)
+            BaseSocksProtocol(None, None, None, loop=self.loop,
+                              waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
-            BaseSocksProtocol(None, None, 123, loop=self.loop)
+            BaseSocksProtocol(None, None, 123, loop=self.loop,
+                              waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
-            BaseSocksProtocol(None, None, ('python.org',), loop=self.loop)
+            BaseSocksProtocol(None, None, ('python.org',), loop=self.loop,
+                              waiter=None, app_protocol_factory=None)
 
     def test_write_request(self):
-        proto = BaseSocksProtocol(None, None, ('python.org', 80),
-                                  loop=self.loop)
+        proto = make_base(self.loop)
         proto._transport = mock.Mock()
 
         proto.write_request([b'\x00', b'\x01\x02', 0x03])
@@ -81,6 +96,180 @@ class TestBaseSocksProtocol(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             proto.write_request(['\x00'])
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_connection_made_os_error(self, ef_mock):
+        os_err_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = os_err_fut
+
+        waiter = asyncio.Future(loop=self.loop)
+        proto = make_base(self.loop, waiter=waiter)
+        proto.connection_made(mock.Mock())
+
+        self.assertIs(proto._negotiate_fut, os_err_fut)
+
+        with self.assertRaises(OSError):
+            os_err_fut.set_exception(OSError('test'))
+            self.loop.run_until_complete(os_err_fut)
+        self.assertIn('test', str(waiter.exception()))
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_connection_made_socks_err(self, ef_mock):
+        socks_err_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = socks_err_fut
+
+        waiter = asyncio.Future(loop=self.loop)
+        proto = make_base(self.loop, waiter=waiter)
+        proto.connection_made(mock.Mock())
+
+        self.assertIs(proto._negotiate_fut, socks_err_fut)
+
+        with self.assertRaises(aiosocks.SocksError):
+            socks_err_fut.set_exception(aiosocks.SocksError('test'))
+            self.loop.run_until_complete(socks_err_fut)
+        self.assertIn('Can not connect to', str(waiter.exception()))
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_connection_made_without_app_proto(self, ef_mock):
+        success_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = success_fut
+
+        waiter = asyncio.Future(loop=self.loop)
+        proto = make_base(self.loop, waiter=waiter)
+        proto.connection_made(mock.Mock())
+
+        self.assertIs(proto._negotiate_fut, success_fut)
+
+        success_fut.set_result(True)
+        self.loop.run_until_complete(success_fut)
+        self.assertTrue(waiter.done())
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_connection_made_with_app_proto(self, ef_mock):
+        success_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = success_fut
+
+        waiter = asyncio.Future(loop=self.loop)
+        proto = make_base(self.loop, waiter=waiter,
+                          ap_factory=lambda: asyncio.Protocol())
+        proto.connection_made(mock.Mock())
+
+        self.assertIs(proto._negotiate_fut, success_fut)
+
+        success_fut.set_result(True)
+        self.loop.run_until_complete(success_fut)
+        self.assertTrue(waiter.done())
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_connection_lost(self, ef_mock):
+        negotiate_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = negotiate_fut
+        app_proto = mock.Mock()
+
+        loop_mock = mock.Mock()
+
+        proto = make_base(loop_mock, ap_factory=lambda: app_proto)
+        proto.connection_made(mock.Mock())
+
+        # negotiate not completed
+        proto.connection_lost(True)
+        self.assertFalse(loop_mock.call_soon.called)
+
+        # negotiate successfully competed
+        negotiate_fut.set_result(True)
+        proto.connection_lost(True)
+        self.assertTrue(loop_mock.call_soon.called)
+
+        # negotiate failed
+        negotiate_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = negotiate_fut
+
+        proto = make_base(loop_mock, ap_factory=lambda: app_proto)
+        proto.connection_made(mock.Mock())
+
+        negotiate_fut.set_exception(Exception())
+        proto.connection_lost(True)
+        self.assertTrue(loop_mock.call_soon.called)
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_pause_writing(self, ef_mock):
+        negotiate_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = negotiate_fut
+        app_proto = mock.Mock()
+
+        loop_mock = mock.Mock()
+
+        proto = make_base(loop_mock, ap_factory=lambda: app_proto)
+        proto.connection_made(mock.Mock())
+
+        # negotiate not completed
+        proto.pause_writing()
+        self.assertFalse(app_proto.pause_writing.called)
+
+        # negotiate successfully competed
+        negotiate_fut.set_result(True)
+        proto.pause_writing()
+        self.assertTrue(app_proto.pause_writing.called)
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_resume_writing(self, ef_mock):
+        negotiate_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = negotiate_fut
+        app_proto = mock.Mock()
+
+        loop_mock = mock.Mock()
+
+        proto = make_base(loop_mock, ap_factory=lambda: app_proto)
+        proto.connection_made(mock.Mock())
+
+        # negotiate not completed
+        with self.assertRaises(AssertionError):
+            proto.resume_writing()
+
+        # negotiate fail
+        negotiate_fut.set_exception(Exception())
+        proto.resume_writing()
+        self.assertTrue(app_proto.resume_writing.called)
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_data_received(self, ef_mock):
+        negotiate_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = negotiate_fut
+        app_proto = mock.Mock()
+
+        loop_mock = mock.Mock()
+
+        proto = make_base(loop_mock, ap_factory=lambda: app_proto)
+        proto.connection_made(mock.Mock())
+
+        # negotiate not completed
+        proto.data_received(b'123')
+        self.assertFalse(app_proto.data_received.called)
+
+        # negotiate successfully competed
+        negotiate_fut.set_result(True)
+        proto.data_received(b'123')
+        self.assertTrue(app_proto.data_received.called)
+
+    @mock.patch('aiosocks.protocols.ensure_future')
+    def test_eof_received(self, ef_mock):
+        negotiate_fut = asyncio.Future(loop=self.loop)
+        ef_mock.return_value = negotiate_fut
+        app_proto = mock.Mock()
+
+        loop_mock = mock.Mock()
+
+        proto = make_base(loop_mock, ap_factory=lambda: app_proto)
+        proto.connection_made(mock.Mock())
+
+        # negotiate not completed
+        proto.eof_received()
+        self.assertFalse(app_proto.eof_received.called)
+
+        # negotiate successfully competed
+        negotiate_fut.set_result(True)
+        proto.eof_received()
+        self.assertTrue(app_proto.eof_received.called)
 
 
 class TestSocks4Protocol(unittest.TestCase):
@@ -97,21 +286,27 @@ class TestSocks4Protocol(unittest.TestCase):
         dst = ('python.org', 80)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks4Protocol(None, None, dst, loop=self.loop)
+            aiosocks.Socks4Protocol(None, None, dst, loop=self.loop,
+                                    waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks4Protocol(None, auth, dst, loop=self.loop)
+            aiosocks.Socks4Protocol(None, auth, dst, loop=self.loop,
+                                    waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
             aiosocks.Socks4Protocol(aiosocks.Socks5Addr('host'), auth, dst,
-                                    loop=self.loop)
+                                    loop=self.loop, waiter=None,
+                                    app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
             aiosocks.Socks4Protocol(addr, aiosocks.Socks5Auth('l', 'p'), dst,
-                                    loop=self.loop)
+                                    loop=self.loop, waiter=None,
+                                    app_protocol_factory=None)
 
-        aiosocks.Socks4Protocol(addr, None, dst, loop=self.loop)
-        aiosocks.Socks4Protocol(addr, auth, dst, loop=self.loop)
+        aiosocks.Socks4Protocol(addr, None, dst, loop=self.loop,
+                                waiter=None, app_protocol_factory=None)
+        aiosocks.Socks4Protocol(addr, auth, dst, loop=self.loop,
+                                waiter=None, app_protocol_factory=None)
 
     def test_request_building(self):
         resp = b'\x00\x5a\x00P\x7f\x00\x00\x01'
@@ -230,21 +425,27 @@ class TestSocks5Protocol(unittest.TestCase):
         dst = ('python.org', 80)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks5Protocol(None, None, dst, loop=self.loop)
+            aiosocks.Socks5Protocol(None, None, dst, loop=self.loop,
+                                    waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
-            aiosocks.Socks5Protocol(None, auth, dst, loop=self.loop)
+            aiosocks.Socks5Protocol(None, auth, dst, loop=self.loop,
+                                    waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
             aiosocks.Socks5Protocol(aiosocks.Socks4Addr('host'),
-                                    auth, dst, loop=self.loop)
+                                    auth, dst, loop=self.loop,
+                                    waiter=None, app_protocol_factory=None)
 
         with self.assertRaises(ValueError):
             aiosocks.Socks5Protocol(addr, aiosocks.Socks4Auth('l'),
-                                    dst, loop=self.loop)
+                                    dst, loop=self.loop,
+                                    waiter=None, app_protocol_factory=None)
 
-        aiosocks.Socks5Protocol(addr, None, dst, loop=self.loop)
-        aiosocks.Socks5Protocol(addr, auth, dst, loop=self.loop)
+        aiosocks.Socks5Protocol(addr, None, dst, loop=self.loop,
+                                waiter=None, app_protocol_factory=None)
+        aiosocks.Socks5Protocol(addr, auth, dst, loop=self.loop,
+                                waiter=None, app_protocol_factory=None)
 
     def test_authenticate(self):
         # invalid server version

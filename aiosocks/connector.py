@@ -33,12 +33,16 @@ class SocksConnector(aiohttp.TCPConnector):
 
     @asyncio.coroutine
     def _create_connection(self, req):
+        if req.ssl:
+            sslcontext = self.ssl_context
+        else:
+            sslcontext = None
+
         if not self._remote_resolve:
             dst_hosts = yield from self._resolve_host(req.host, req.port)
             dst = dst_hosts[0]['host'], dst_hosts[0]['port']
         else:
             dst = req.host, req.port
-        exc = None
 
         # if self._resolver is AsyncResolver and self._proxy.host
         # is ip address, then aiodns raise DNSError.
@@ -56,6 +60,7 @@ class SocksConnector(aiohttp.TCPConnector):
         except ValueError:
             proxy_hosts = yield from self._resolve_host(self._proxy.host,
                                                         self._proxy.port)
+        exc = None
 
         for hinfo in proxy_hosts:
             try:
@@ -65,8 +70,29 @@ class SocksConnector(aiohttp.TCPConnector):
                 transp, proto = yield from create_connection(
                     self._factory, proxy, self._proxy_auth, dst,
                     loop=self._loop, remote_resolve=self._remote_resolve,
-                    ssl=None, family=hinfo['family'], proto=hinfo['proto'],
-                    flags=hinfo['flags'], local_addr=self._local_addr)
+                    ssl=sslcontext, family=hinfo['family'],
+                    proto=hinfo['proto'], flags=hinfo['flags'],
+                    local_addr=self._local_addr,
+                    server_hostname=req.host if sslcontext else None)
+
+                has_cert = transp.get_extra_info('sslcontext')
+                if has_cert and self._fingerprint:
+                    sock = transp.get_extra_info('socket')
+                    if not hasattr(sock, 'getpeercert'):
+                        # Workaround for asyncio 3.5.0
+                        # Starting from 3.5.1 version
+                        # there is 'ssl_object' extra info in transport
+                        sock = transp._ssl_protocol._sslpipe.ssl_object
+                    # gives DER-encoded cert as a sequence of bytes (or None)
+                    cert = sock.getpeercert(binary_form=True)
+                    assert cert
+                    got = self._hashfunc(cert).digest()
+                    expected = self._fingerprint
+                    if got != expected:
+                        transp.close()
+                        raise aiohttp.FingerprintMismatch(
+                            expected, got, req.host, 80
+                        )
 
                 return transp, proto
             except (OSError, SocksError, SocksConnectionError) as e:

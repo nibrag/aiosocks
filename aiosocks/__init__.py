@@ -47,7 +47,15 @@ def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
             "proxy is Socks5Addr but proxy_auth is not Socks5Auth"
         )
 
+    if server_hostname is not None and not ssl:
+        raise ValueError('server_hostname is only meaningful with ssl')
+
+    if server_hostname is None and ssl:
+        # read details: asyncio.create_connection
+        server_hostname = dst[0]
+
     loop = loop or asyncio.get_event_loop()
+    waiter = asyncio.Future(loop=loop)
 
     def socks_factory():
         if isinstance(proxy, Socks4Addr):
@@ -55,30 +63,24 @@ def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
         else:
             socks_proto = Socks5Protocol
 
-        return socks_proto(
-            proxy=proxy, proxy_auth=proxy_auth, dst=dst,
-            remote_resolve=remote_resolve, loop=loop)
+        return socks_proto(proxy=proxy, proxy_auth=proxy_auth, dst=dst,
+                           app_protocol_factory=protocol_factory,
+                           waiter=waiter, remote_resolve=remote_resolve,
+                           loop=loop, ssl=ssl, server_hostname=server_hostname)
 
     try:
         transport, protocol = yield from loop.create_connection(
-            socks_factory, proxy.host, proxy.port, ssl=ssl, family=family,
-            proto=proto, flags=flags, sock=sock, local_addr=local_addr,
-            server_hostname=server_hostname)
+            socks_factory, proxy.host, proxy.port, family=family,
+            proto=proto, flags=flags, sock=sock, local_addr=local_addr)
     except OSError as exc:
         raise SocksConnectionError(
             '[Errno %s] Can not connect to proxy %s:%d [%s]' %
             (exc.errno, proxy.host, proxy.port, exc.strerror)) from exc
 
-    # Wait until communication with proxy server is finished
     try:
-        yield from protocol.negotiate_done()
-    except SocksError as exc:
-        raise SocksError('Can not connect to %s:%s [%s]' %
-                         (dst[0], dst[1], exc))
+        yield from waiter
+    except:
+        transport.close()
+        raise
 
-    if protocol_factory:
-        protocol = protocol_factory()
-        protocol.connection_made(transport)
-        transport._protocol = protocol
-
-    return transport, protocol
+    return protocol.app_transport, protocol.app_protocol

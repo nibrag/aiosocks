@@ -17,7 +17,9 @@ except ImportError:
 
 
 class BaseSocksProtocol(asyncio.StreamReaderProtocol):
-    def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
+    def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
+                 remote_resolve=True, loop=None, ssl=False,
+                 server_hostname=None):
         if not isinstance(dst, (tuple, list)) or len(dst) != 2:
             raise ValueError(
                 'Invalid dst format, tuple("dst_host", dst_port))'
@@ -30,18 +32,79 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
 
         self._loop = loop or asyncio.get_event_loop()
         self._transport = None
-        self._negotiate_done = None
+        self._waiter = waiter
+        self._negotiate_fut = None
+        self._ssl = ssl
+        self._server_hostname = server_hostname
+
+        if app_protocol_factory:
+            self._app_protocol = app_protocol_factory()
+        else:
+            self._app_protocol = self
 
         reader = asyncio.StreamReader(loop=self._loop)
 
         super().__init__(stream_reader=reader, loop=self._loop)
 
     def connection_made(self, transport):
+        # connection_made is called
+        if self._transport:
+            return
+
         super().connection_made(transport)
         self._transport = transport
 
+        def init_app_protocol(fut):
+            exc = fut.exception()
+            if exc:
+                if isinstance(exc, SocksError):
+                    exc = SocksError('Can not connect to %s:%s. %s' %
+                                     (self._dst_host, self._dst_port, exc))
+                self._waiter.set_exception(exc)
+            else:
+                if self._ssl:
+                    sock = self._transport.get_extra_info('socket')
+
+                    self._transport = self._loop._make_ssl_transport(
+                        rawsock=sock, protocol=self._app_protocol,
+                        sslcontext=self._ssl, server_side=False,
+                        server_hostname=self._server_hostname,
+                        waiter=self._waiter)
+                else:
+                    self._app_protocol.connection_made(transport)
+                    self._waiter.set_result(True)
+
         req_coro = self.socks_request(c.SOCKS_CMD_CONNECT)
-        self._negotiate_done = ensure_future(req_coro, loop=self._loop)
+        self._negotiate_fut = ensure_future(req_coro, loop=self._loop)
+        self._negotiate_fut.add_done_callback(init_app_protocol)
+
+    def connection_lost(self, exc):
+        if self._negotiate_fut.done() and not self._negotiate_fut.exception():
+            self._loop.call_soon(self._app_protocol.connection_lost, exc)
+        super().connection_lost(exc)
+
+    def pause_writing(self):
+        if self._negotiate_fut.done():
+            self._app_protocol.pause_writing()
+        else:
+            super().pause_writing()
+
+    def resume_writing(self):
+        if self._negotiate_fut.done():
+            self._app_protocol.resume_writing()
+        else:
+            super().resume_writing()
+
+    def data_received(self, data):
+        if self._negotiate_fut.done():
+            self._app_protocol.data_received(data)
+        else:
+            super().data_received(data)
+
+    def eof_received(self):
+        if self._negotiate_fut.done() and not self._negotiate_fut.exception():
+            self._app_protocol.eof_received()
+        super().eof_received()
 
     @asyncio.coroutine
     def socks_request(self, cmd):
@@ -74,12 +137,19 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
             raise OSError('getaddrinfo() returned empty list')
         return infos[0][0], infos[0][4][0]
 
-    def negotiate_done(self):
-        return self._negotiate_done
+    @property
+    def app_protocol(self):
+        return self._app_protocol
+
+    @property
+    def app_transport(self):
+        return self._transport
 
 
 class Socks4Protocol(BaseSocksProtocol):
-    def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
+    def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
+                 remote_resolve=True, loop=None, ssl=False,
+                 server_hostname=None):
         proxy_auth = proxy_auth or Socks4Auth('')
 
         if not isinstance(proxy, Socks4Addr):
@@ -88,7 +158,8 @@ class Socks4Protocol(BaseSocksProtocol):
         if not isinstance(proxy_auth, Socks4Auth):
             raise ValueError('Invalid proxy_auth format')
 
-        super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
+        super().__init__(proxy, proxy_auth, dst, app_protocol_factory, waiter,
+                         remote_resolve, loop, ssl, server_hostname)
 
     @asyncio.coroutine
     def socks_request(self, cmd):
@@ -130,7 +201,9 @@ class Socks4Protocol(BaseSocksProtocol):
 
 
 class Socks5Protocol(BaseSocksProtocol):
-    def __init__(self, proxy, proxy_auth, dst, remote_resolve=True, loop=None):
+    def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
+                 remote_resolve=True, loop=None, ssl=False,
+                 server_hostname=None):
         proxy_auth = proxy_auth or Socks5Auth('', '')
 
         if not isinstance(proxy, Socks5Addr):
@@ -139,7 +212,8 @@ class Socks5Protocol(BaseSocksProtocol):
         if not isinstance(proxy_auth, Socks5Auth):
             raise ValueError('Invalid proxy_auth format')
 
-        super().__init__(proxy, proxy_auth, dst, remote_resolve, loop)
+        super().__init__(proxy, proxy_auth, dst, app_protocol_factory, waiter,
+                         remote_resolve, loop, ssl, server_hostname)
 
     @asyncio.coroutine
     def socks_request(self, cmd):

@@ -24,7 +24,12 @@ class TestSocksConnector(unittest.TestCase):
 
         return mock.Mock(side_effect=coroutine(coro))
 
-    def test_connect_proxy_ip(self):
+    @mock.patch('aiosocks.connector.create_connection')
+    def test_connect_proxy_ip(self, cr_conn_mock):
+        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
+        cr_conn_mock.side_effect = \
+            self._fake_coroutine((tr, proto)).side_effect
+
         loop_mock = mock.Mock()
 
         req = ClientRequest('GET', 'http://python.org', loop=self.loop)
@@ -33,21 +38,18 @@ class TestSocksConnector(unittest.TestCase):
 
         loop_mock.getaddrinfo = self._fake_coroutine([mock.MagicMock()])
 
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        proto.negotiate_done = self._fake_coroutine(True)
-        loop_mock.create_connection = self._fake_coroutine((tr, proto))
-
         conn = self.loop.run_until_complete(connector.connect(req))
 
         self.assertTrue(loop_mock.getaddrinfo.is_called)
         self.assertIs(conn._transport, tr)
-        self.assertTrue(
-            isinstance(conn._protocol, aiohttp.parsers.StreamProtocol)
-        )
 
         conn.close()
 
-    def test_connect_proxy_domain(self):
+    @mock.patch('aiosocks.connector.create_connection')
+    def test_connect_proxy_domain(self, cr_conn_mock):
+        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
+        cr_conn_mock.side_effect = \
+            self._fake_coroutine((tr, proto)).side_effect
         loop_mock = mock.Mock()
 
         req = ClientRequest('GET', 'http://python.org', loop=self.loop)
@@ -55,71 +57,60 @@ class TestSocksConnector(unittest.TestCase):
                                    None, loop=loop_mock)
 
         connector._resolve_host = self._fake_coroutine([mock.MagicMock()])
-
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        proto.negotiate_done = self._fake_coroutine(True)
-        loop_mock.create_connection = self._fake_coroutine((tr, proto))
 
         conn = self.loop.run_until_complete(connector.connect(req))
 
         self.assertTrue(connector._resolve_host.is_called)
         self.assertEqual(connector._resolve_host.call_count, 1)
         self.assertIs(conn._transport, tr)
-        self.assertTrue(
-            isinstance(conn._protocol, aiohttp.parsers.StreamProtocol)
-        )
 
         conn.close()
 
-    def test_connect_locale_resolve(self):
-        loop_mock = mock.Mock()
+    @mock.patch('aiosocks.connector.create_connection')
+    def test_connect_locale_resolve(self, cr_conn_mock):
+        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
+        cr_conn_mock.side_effect = \
+            self._fake_coroutine((tr, proto)).side_effect
 
         req = ClientRequest('GET', 'http://python.org', loop=self.loop)
         connector = SocksConnector(aiosocks.Socks5Addr('proxy.example'),
-                                   None, loop=loop_mock, remote_resolve=False)
+                                   None, loop=self.loop, remote_resolve=False)
 
         connector._resolve_host = self._fake_coroutine([mock.MagicMock()])
-
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        proto.negotiate_done = self._fake_coroutine(True)
-        loop_mock.create_connection = self._fake_coroutine((tr, proto))
 
         conn = self.loop.run_until_complete(connector.connect(req))
 
         self.assertTrue(connector._resolve_host.is_called)
         self.assertEqual(connector._resolve_host.call_count, 2)
-        self.assertIs(conn._transport, tr)
-        self.assertTrue(
-            isinstance(conn._protocol, aiohttp.parsers.StreamProtocol)
-        )
 
         conn.close()
 
-    def test_proxy_connect_fail(self):
+    @mock.patch('aiosocks.connector.create_connection')
+    def test_proxy_connect_fail(self, cr_conn_mock):
         loop_mock = mock.Mock()
+        cr_conn_mock.side_effect = \
+            self._fake_coroutine(aiosocks.SocksConnectionError()).side_effect
 
         req = ClientRequest('GET', 'http://python.org', loop=self.loop)
         connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
                                    None, loop=loop_mock)
 
         loop_mock.getaddrinfo = self._fake_coroutine([mock.MagicMock()])
-        loop_mock.create_connection = self._fake_coroutine(OSError())
 
         with self.assertRaises(aiohttp.ProxyConnectionError):
             self.loop.run_until_complete(connector.connect(req))
 
-    def test_proxy_negotiate_fail(self):
+    @mock.patch('aiosocks.connector.create_connection')
+    def test_proxy_negotiate_fail(self, cr_conn_mock):
         loop_mock = mock.Mock()
+        cr_conn_mock.side_effect = \
+            self._fake_coroutine(aiosocks.SocksError()).side_effect
 
         req = ClientRequest('GET', 'http://python.org', loop=self.loop)
         connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
                                    None, loop=loop_mock)
 
         loop_mock.getaddrinfo = self._fake_coroutine([mock.MagicMock()])
-
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        proto.negotiate_done = self._fake_coroutine(aiosocks.SocksError())
-        loop_mock.create_connection = self._fake_coroutine((tr, proto))
 
         with self.assertRaises(aiosocks.SocksError):
             self.loop.run_until_complete(connector.connect(req))
