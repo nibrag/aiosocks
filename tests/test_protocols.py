@@ -2,6 +2,7 @@ import asyncio
 import aiosocks
 import unittest
 import socket
+import ssl as ssllib
 from unittest import mock
 from asyncio import coroutine as coro
 import aiosocks.constants as c
@@ -255,6 +256,21 @@ class TestBaseSocksProtocol(unittest.TestCase):
         proto = make_base(loop_mock)
         proto._negotiate_done = True
         proto.eof_received()
+
+    def test_make_ssl_proto(self):
+        loop_mock = mock.Mock()
+        app_proto = mock.Mock()
+
+        ssl_context = ssllib.create_default_context()
+        proto = make_base(loop_mock,
+                          ap_factory=lambda: app_proto, ssl=ssl_context)
+        proto.socks_request = fake_coroutine((None, None))
+        proto._transport = mock.Mock()
+        self.loop.run_until_complete(proto.negotiate(None, None))
+
+        self.assertTrue(loop_mock._make_ssl_transport.called)
+        self.assertIs(loop_mock._make_ssl_transport.call_args[1]['sslcontext'],
+                      ssl_context)
 
     @mock.patch('aiosocks.protocols.asyncio.Task')
     def test_func_negotiate_cb_call(self, task_mock):
