@@ -2,7 +2,7 @@ import unittest
 import aiosocks
 import asyncio
 from unittest import mock
-from .socks_serv import fake_socks_srv
+from .helpers import fake_coroutine
 
 try:
     from asyncio import ensure_future
@@ -17,14 +17,6 @@ class TestCreateConnection(unittest.TestCase):
 
     def tearDown(self):
         self.loop.close()
-
-    def _fake_coroutine(self, return_value):
-        def coro(*args, **kwargs):
-            if isinstance(return_value, Exception):
-                raise return_value
-            return return_value
-
-        return mock.Mock(side_effect=asyncio.coroutine(coro))
 
     def test_init(self):
         addr = aiosocks.Socks5Addr('localhost')
@@ -90,7 +82,7 @@ class TestCreateConnection(unittest.TestCase):
         dst = ('python.org', 80)
 
         loop_mock = mock.Mock()
-        loop_mock.create_connection = self._fake_coroutine(OSError())
+        loop_mock.create_connection = fake_coroutine(OSError())
 
         with self.assertRaises(aiosocks.SocksConnectionError):
             conn = aiosocks.create_connection(
@@ -98,323 +90,22 @@ class TestCreateConnection(unittest.TestCase):
             )
             self.loop.run_until_complete(conn)
 
-
-class TestCreateSocks4Connection(unittest.TestCase):
-    def setUp(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(None)
-
-    def tearDown(self):
-        self.loop.close()
-
-    def test_connect_success(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x00\x5a\x04W\x01\x01\x01\x01test')
-        )
-        addr = aiosocks.Socks4Addr('127.0.0.1', port)
-        auth = aiosocks.Socks4Auth('usr')
+    @mock.patch('aiosocks.asyncio.Future')
+    def test_negotiate_fail(self, future_mock):
+        addr = aiosocks.Socks5Addr('localhost')
+        auth = aiosocks.Socks5Auth('usr', 'pwd')
         dst = ('python.org', 80)
 
-        coro = aiosocks.create_connection(
-            None, addr, auth, dst, loop=self.loop)
-        transport, protocol = self.loop.run_until_complete(coro)
-
-        _, addr = protocol._negotiate_fut.result()
-        self.assertEqual(addr, ('1.1.1.1', 1111))
-
-        data = self.loop.run_until_complete(protocol._stream_reader.read(4))
-        self.assertEqual(data, b'test')
-
-        server.close()
-        transport.close()
-
-    def test_invalid_ver(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x01\x5a\x04W\x01\x01\x01\x01')
+        loop_mock = mock.Mock()
+        loop_mock.create_connection = fake_coroutine(
+            (mock.Mock(), mock.Mock())
         )
-        addr = aiosocks.Socks4Addr('127.0.0.1', port)
-        auth = aiosocks.Socks4Auth('usr')
-        dst = ('python.org', 80)
 
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('invalid data', str(ct.exception))
+        fut = fake_coroutine(aiosocks.SocksError())
+        future_mock.side_effect = fut.side_effect
 
-        server.close()
-
-    def test_access_not_granted(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x00\x5b\x04W\x01\x01\x01\x01')
-        )
-        addr = aiosocks.Socks4Addr('127.0.0.1', port)
-        auth = aiosocks.Socks4Auth('usr')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('0x5b', str(ct.exception))
-
-        server.close()
-
-
-class TestCreateSocks5Connect(unittest.TestCase):
-    def setUp(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(None)
-
-    def tearDown(self):
-        self.loop.close()
-
-    def test_connect_success_anonymous(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(
-                self.loop,
-                b'\x05\x00\x05\x00\x00\x01\x01\x01\x01\x01\x04Wtest'
+        with self.assertRaises(aiosocks.SocksError):
+            conn = aiosocks.create_connection(
+                None, addr, auth, dst, loop=loop_mock
             )
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        coro = aiosocks.create_connection(
-            None, addr, auth, dst, loop=self.loop)
-        transport, protocol = self.loop.run_until_complete(coro)
-
-        _, addr = protocol._negotiate_fut.result()
-        self.assertEqual(addr, ('1.1.1.1', 1111))
-
-        data = self.loop.run_until_complete(protocol._stream_reader.read(4))
-        self.assertEqual(data, b'test')
-
-        server.close()
-        transport.close()
-
-    def test_connect_success_usr_pwd(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(
-                self.loop,
-                b'\x05\x02\x01\x00\x05\x00\x00\x01\x01\x01\x01\x01\x04Wtest'
-            )
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        coro = aiosocks.create_connection(
-            None, addr, auth, dst, loop=self.loop)
-        transport, protocol = self.loop.run_until_complete(coro)
-
-        _, addr = protocol._negotiate_fut.result()
-        self.assertEqual(addr, ('1.1.1.1', 1111))
-
-        data = self.loop.run_until_complete(protocol._stream_reader.read(4))
-        self.assertEqual(data, b'test')
-
-        server.close()
-        transport.close()
-
-    def test_auth_ver_err(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x04\x02')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('invalid version', str(ct.exception))
-
-        server.close()
-
-    def test_auth_method_rejected(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\xFF')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('authentication methods were rejected',
-                      str(ct.exception))
-
-        server.close()
-
-    def test_auth_status_invalid(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\xF0')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('invalid data', str(ct.exception))
-
-        server.close()
-
-    def test_auth_status_invalid2(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\x02\x02\x00')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('invalid data', str(ct.exception))
-
-        server.close()
-
-    def test_auth_failed(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\x02\x01\x01')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('authentication failed', str(ct.exception))
-
-        server.close()
-
-    def test_cmd_ver_err(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\x02\x01\x00\x04\x00\x00')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('invalid version', str(ct.exception))
-
-        server.close()
-
-    def test_cmd_not_granted(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\x02\x01\x00\x05\x01\x00')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('General SOCKS server failure', str(ct.exception))
-
-        server.close()
-
-    def test_invalid_address_type(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(self.loop, b'\x05\x02\x01\x00\x05\x00\x00\xFF')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        with self.assertRaises(aiosocks.SocksError) as ct:
-            coro = aiosocks.create_connection(
-                None, addr, auth, dst, loop=self.loop)
-            transport, protocol = self.loop.run_until_complete(coro)
-            transport.close()
-        self.assertIn('invalid data', str(ct.exception))
-
-        server.close()
-
-    def test_atype_ipv4(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(
-                self.loop,
-                b'\x05\x02\x01\x00\x05\x00\x00\x01\x01\x01\x01\x01\x04W'
-            )
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        coro = aiosocks.create_connection(
-            None, addr, auth, dst, loop=self.loop)
-        transport, protocol = self.loop.run_until_complete(coro)
-
-        _, addr = protocol._negotiate_fut.result()
-        self.assertEqual(addr, ('1.1.1.1', 1111))
-
-        transport.close()
-        server.close()
-
-    def test_atype_ipv6(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(
-                self.loop,
-                b'\x05\x02\x01\x00\x05\x00\x00\x04\x00\x00\x00\x00'
-                b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x11\x04W')
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        coro = aiosocks.create_connection(
-            None, addr, auth, dst, loop=self.loop)
-        transport, protocol = self.loop.run_until_complete(coro)
-
-        _, addr = protocol._negotiate_fut.result()
-        self.assertEqual(addr, ('::111', 1111))
-
-        transport.close()
-        server.close()
-
-    def test_atype_domain(self):
-        server, port = self.loop.run_until_complete(
-            fake_socks_srv(
-                self.loop,
-                b'\x05\x02\x01\x00\x05\x00\x00\x03\x0apython.org\x04W'
-            )
-        )
-        addr = aiosocks.Socks5Addr('127.0.0.1', port)
-        auth = aiosocks.Socks5Auth('usr', 'pwd')
-        dst = ('python.org', 80)
-
-        coro = aiosocks.create_connection(
-            None, addr, auth, dst, loop=self.loop)
-        transport, protocol = self.loop.run_until_complete(coro)
-
-        _, addr = protocol._negotiate_fut.result()
-        self.assertEqual(addr, (b'python.org', 1111))
-
-        transport.close()
-        server.close()
+            self.loop.run_until_complete(conn)
