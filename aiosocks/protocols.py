@@ -37,6 +37,8 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
 
         self._transport = None
         self._negotiate_done = False
+        self._proxy_peername = None
+        self._proxy_sockname = None
 
         if app_protocol_factory:
             self._app_protocol = app_protocol_factory()
@@ -154,6 +156,29 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
     @property
     def app_transport(self):
         return self._transport
+
+    @property
+    def proxy_sockname(self):
+        """
+        Returns the bound IP address and port number at the proxy.
+        """
+        return self._proxy_sockname
+
+    @property
+    def proxy_peername(self):
+        """
+        Returns the IP and port number of the proxy.
+        """
+        sock = self._transport.get_extra_info('socket')
+        return sock.peername if sock else None
+
+    @property
+    def peername(self):
+        """
+        Returns the IP address and port number of the destination
+        machine (note: get_proxy_peername returns the proxy)
+        """
+        return self._proxy_peername
 
 
 class Socks4Protocol(BaseSocksProtocol):
