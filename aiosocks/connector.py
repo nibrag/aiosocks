@@ -46,7 +46,7 @@ class SocksConnector(aiohttp.TCPConnector):
 
         # if self._resolver is AsyncResolver and self._proxy.host
         # is ip address, then aiodns raise DNSError.
-        # It's aiohttp bug? Hot fix:
+        # https://github.com/KeepSafe/aiohttp/pull/874. Fix:
         try:
             ipaddress.ip_address(self._proxy.host)
             proxy_hosts = yield from self._loop.getaddrinfo(self._proxy.host,
