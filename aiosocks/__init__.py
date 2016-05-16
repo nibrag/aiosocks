@@ -85,3 +85,13 @@ def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
         raise
 
     return protocol.app_transport, protocol.app_protocol
+
+
+@asyncio.coroutine
+def open_connection(proxy, proxy_auth, dst, *, remote_resolve=True,
+                    loop=None, limit=DEFAULT_LIMIT, **kwds):
+    _, protocol = yield from create_connection(
+        None, proxy, proxy_auth, dst, reader_limit=limit,
+        remote_resolve=remote_resolve, loop=loop, **kwds)
+
+    return protocol.reader, protocol.writer

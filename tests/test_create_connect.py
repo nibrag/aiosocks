@@ -109,3 +109,26 @@ class TestCreateConnection(unittest.TestCase):
                 None, addr, auth, dst, loop=loop_mock
             )
             self.loop.run_until_complete(conn)
+
+    @mock.patch('aiosocks.asyncio.Future')
+    def test_open_connection(self, future_mock):
+        addr = aiosocks.Socks5Addr('localhost')
+        auth = aiosocks.Socks5Auth('usr', 'pwd')
+        dst = ('python.org', 80)
+
+        transp, proto = mock.Mock(), mock.Mock()
+        reader, writer = mock.Mock(), mock.Mock()
+
+        proto.app_protocol.reader, proto.app_protocol.writer = reader, writer
+
+        loop_mock = mock.Mock()
+        loop_mock.create_connection = fake_coroutine((transp, proto))
+
+        fut = fake_coroutine(True)
+        future_mock.side_effect = fut.side_effect
+
+        conn = aiosocks.open_connection(addr, auth, dst, loop=loop_mock)
+        r, w = self.loop.run_until_complete(conn)
+
+        self.assertIs(reader, r)
+        self.assertIs(writer, w)
