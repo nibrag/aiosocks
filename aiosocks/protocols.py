@@ -205,7 +205,8 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
 class Socks4Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None, reader_limit=DEFAULT_LIMIT):
+                 server_hostname=None, negotiate_done_cb=None,
+                 reader_limit=DEFAULT_LIMIT):
         proxy_auth = proxy_auth or Socks4Auth('')
 
         if not isinstance(proxy, Socks4Addr):
@@ -217,7 +218,8 @@ class Socks4Protocol(BaseSocksProtocol):
         super().__init__(proxy, proxy_auth, dst, app_protocol_factory,
                          waiter, remote_resolve=remote_resolve, loop=loop,
                          ssl=ssl, server_hostname=server_hostname,
-                         reader_limit=reader_limit)
+                         reader_limit=reader_limit,
+                         negotiate_done_cb=negotiate_done_cb)
 
     @asyncio.coroutine
     def socks_request(self, cmd):
@@ -261,7 +263,8 @@ class Socks4Protocol(BaseSocksProtocol):
 class Socks5Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None, reader_limit=DEFAULT_LIMIT):
+                 server_hostname=None, negotiate_done_cb=None,
+                 reader_limit=DEFAULT_LIMIT):
         proxy_auth = proxy_auth or Socks5Auth('', '')
 
         if not isinstance(proxy, Socks5Addr):
@@ -273,7 +276,8 @@ class Socks5Protocol(BaseSocksProtocol):
         super().__init__(proxy, proxy_auth, dst, app_protocol_factory,
                          waiter, remote_resolve=remote_resolve, loop=loop,
                          ssl=ssl, server_hostname=server_hostname,
-                         reader_limit=reader_limit)
+                         reader_limit=reader_limit,
+                         negotiate_done_cb=negotiate_done_cb)
 
     @asyncio.coroutine
     def socks_request(self, cmd):
