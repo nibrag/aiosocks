@@ -1,13 +1,15 @@
-import unittest
 import aiosocks
 import asyncio
+import aiohttp
+import unittest
+from aiosocks.connector import SocksConnector
 
 try:
     from asyncio import ensure_future
 except ImportError:
     ensure_future = asyncio.async
 
-from .helpers import fake_socks_srv
+from .helpers import fake_socks_srv, fake_socks4_srv, http_srv
 
 
 class TestCreateSocks4Connection(unittest.TestCase):
@@ -263,3 +265,58 @@ class TestCreateSocks5Connect(unittest.TestCase):
             self.assertEqual(protocol.proxy_sockname, (b'python.org', 1111))
 
             transport.close()
+
+
+class TestSocksConnector(unittest.TestCase):
+    def setUp(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(None)
+
+    def tearDown(self):
+        self.loop.close()
+
+    def test_http_connect(self):
+        with fake_socks4_srv(self.loop) as proxy_port:
+            addr = aiosocks.Socks4Addr('127.0.0.1', proxy_port)
+
+            conn = SocksConnector(proxy=addr, proxy_auth=None, loop=self.loop,
+                                  remote_resolve=False)
+
+            with http_srv(self.loop) as url:
+                with aiohttp.ClientSession(connector=conn,
+                                           loop=self.loop) as ses:
+                    @asyncio.coroutine
+                    def make_req():
+                        return (yield from ses.request('get', url=url))
+
+                    resp = self.loop.run_until_complete(make_req())
+
+                    self.assertEqual(resp.status, 200)
+
+                    content = self.loop.run_until_complete(resp.text())
+                    self.assertEqual(content, 'Test message')
+
+                    resp.close()
+
+    def test_https_connect(self):
+        with fake_socks4_srv(self.loop) as proxy_port:
+            addr = aiosocks.Socks4Addr('127.0.0.1', proxy_port)
+
+            conn = SocksConnector(proxy=addr, proxy_auth=None, loop=self.loop,
+                                  remote_resolve=False, verify_ssl=False)
+
+            with http_srv(self.loop, use_ssl=True) as url:
+                with aiohttp.ClientSession(connector=conn,
+                                           loop=self.loop) as ses:
+                    @asyncio.coroutine
+                    def make_req():
+                        return (yield from ses.request('get', url=url))
+
+                    resp = self.loop.run_until_complete(make_req())
+
+                    self.assertEqual(resp.status, 200)
+
+                    content = self.loop.run_until_complete(resp.text())
+                    self.assertEqual(content, 'Test message')
+
+                    resp.close()
