@@ -16,10 +16,14 @@ except ImportError:
     ensure_future = asyncio.async
 
 
+DEFAULT_LIMIT = getattr(asyncio.streams, '_DEFAULT_LIMIT', 2**16)
+
+
 class BaseSocksProtocol(asyncio.StreamReaderProtocol):
-    def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
+    def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter, *,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None, negotiate_done_cb=None):
+                 server_hostname=None, negotiate_done_cb=None,
+                 reader_limit=DEFAULT_LIMIT):
         if not isinstance(dst, (tuple, list)) or len(dst) != 2:
             raise ValueError(
                 'Invalid dst format, tuple("dst_host", dst_port))'
@@ -45,7 +49,7 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         else:
             self._app_protocol = self
 
-        reader = asyncio.StreamReader(loop=self._loop)
+        reader = asyncio.StreamReader(loop=self._loop, limit=reader_limit)
 
         super().__init__(stream_reader=reader,
                          client_connected_cb=self.negotiate, loop=self._loop)
@@ -189,11 +193,19 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         """
         return self._proxy_peername
 
+    @property
+    def reader(self):
+        return self._stream_reader
+
+    @property
+    def writer(self):
+        return self._stream_writer
+
 
 class Socks4Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None):
+                 server_hostname=None, reader_limit=DEFAULT_LIMIT):
         proxy_auth = proxy_auth or Socks4Auth('')
 
         if not isinstance(proxy, Socks4Addr):
@@ -202,8 +214,10 @@ class Socks4Protocol(BaseSocksProtocol):
         if not isinstance(proxy_auth, Socks4Auth):
             raise ValueError('Invalid proxy_auth format')
 
-        super().__init__(proxy, proxy_auth, dst, app_protocol_factory, waiter,
-                         remote_resolve, loop, ssl, server_hostname)
+        super().__init__(proxy, proxy_auth, dst, app_protocol_factory,
+                         waiter, remote_resolve=remote_resolve, loop=loop,
+                         ssl=ssl, server_hostname=server_hostname,
+                         reader_limit=reader_limit)
 
     @asyncio.coroutine
     def socks_request(self, cmd):
@@ -247,7 +261,7 @@ class Socks4Protocol(BaseSocksProtocol):
 class Socks5Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None):
+                 server_hostname=None, reader_limit=DEFAULT_LIMIT):
         proxy_auth = proxy_auth or Socks5Auth('', '')
 
         if not isinstance(proxy, Socks5Addr):
@@ -256,8 +270,10 @@ class Socks5Protocol(BaseSocksProtocol):
         if not isinstance(proxy_auth, Socks5Auth):
             raise ValueError('Invalid proxy_auth format')
 
-        super().__init__(proxy, proxy_auth, dst, app_protocol_factory, waiter,
-                         remote_resolve, loop, ssl, server_hostname)
+        super().__init__(proxy, proxy_auth, dst, app_protocol_factory,
+                         waiter, remote_resolve=remote_resolve, loop=loop,
+                         ssl=ssl, server_hostname=server_hostname,
+                         reader_limit=reader_limit)
 
     @asyncio.coroutine
     def socks_request(self, cmd):

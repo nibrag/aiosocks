@@ -298,6 +298,17 @@ class TestBaseSocksProtocol(unittest.TestCase):
         self.assertTrue(proto._negotiate_done_cb.called)
         self.assertTrue(task_mock.called)
 
+    def test_reader_limit(self):
+        proto = BaseSocksProtocol(None, None, ('python.org', 80),
+                                  None, None, reader_limit=10,
+                                  loop=self.loop)
+        self.assertEqual(proto.reader._limit, 10)
+
+        proto = BaseSocksProtocol(None, None, ('python.org', 80),
+                                  None, None, reader_limit=15,
+                                  loop=self.loop)
+        self.assertEqual(proto.reader._limit, 15)
+
 
 class TestSocks4Protocol(unittest.TestCase):
     def setUp(self):
