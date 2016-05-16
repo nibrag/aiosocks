@@ -65,7 +65,16 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
             self._negotiate_done = True
 
             if self._ssl:
+                # Creating a ssl transport needs to be reworked.
+                # See details: http://bugs.python.org/issue23749
                 sock = self._transport.get_extra_info('socket')
+
+                # temporary fix:
+                self._transport.pause_reading()
+                self._transport._closing = True
+                self._transport._sock = None
+                self._transport._protocol = None
+                self._transport._loop = None
 
                 self._transport = self._loop._make_ssl_transport(
                     rawsock=sock, protocol=self._app_protocol,
