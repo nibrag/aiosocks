@@ -14,7 +14,7 @@ __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
            'NoAcceptableAuthMethods', 'LoginAuthenticationFailed',
            'SocksConnectionError', 'InvalidServerVersion',
-           'InvalidServerReply', 'create_connection')
+           'InvalidServerReply', 'create_connection', 'open_connection')
 
 
 @asyncio.coroutine
