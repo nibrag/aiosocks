@@ -31,6 +31,26 @@ class SocksConnector(aiohttp.TCPConnector):
         """
         return self._proxy_auth
 
+    def _validate_ssl_fingerprint(self, transport, host):
+        has_cert = transport.get_extra_info('sslcontext')
+        if has_cert and self._fingerprint:
+            sock = transport.get_extra_info('socket')
+            if not hasattr(sock, 'getpeercert'):
+                # Workaround for asyncio 3.5.0
+                # Starting from 3.5.1 version
+                # there is 'ssl_object' extra info in transport
+                sock = transport._ssl_protocol._sslpipe.ssl_object
+            # gives DER-encoded cert as a sequence of bytes (or None)
+            cert = sock.getpeercert(binary_form=True)
+            assert cert
+            got = self._hashfunc(cert).digest()
+            expected = self._fingerprint
+            if got != expected:
+                transport.close()
+                raise aiohttp.FingerprintMismatch(
+                    expected, got, host, 80
+                )
+
     @asyncio.coroutine
     def _create_connection(self, req):
         if req.ssl:
@@ -74,25 +94,7 @@ class SocksConnector(aiohttp.TCPConnector):
                     proto=hinfo['proto'], flags=hinfo['flags'],
                     local_addr=self._local_addr,
                     server_hostname=req.host if sslcontext else None)
-
-                has_cert = transp.get_extra_info('sslcontext')
-                if has_cert and self._fingerprint:
-                    sock = transp.get_extra_info('socket')
-                    if not hasattr(sock, 'getpeercert'):
-                        # Workaround for asyncio 3.5.0
-                        # Starting from 3.5.1 version
-                        # there is 'ssl_object' extra info in transport
-                        sock = transp._ssl_protocol._sslpipe.ssl_object
-                    # gives DER-encoded cert as a sequence of bytes (or None)
-                    cert = sock.getpeercert(binary_form=True)
-                    assert cert
-                    got = self._hashfunc(cert).digest()
-                    expected = self._fingerprint
-                    if got != expected:
-                        transp.close()
-                        raise aiohttp.FingerprintMismatch(
-                            expected, got, req.host, 80
-                        )
+                self._validate_ssl_fingerprint(transp, req.host)
 
                 return transp, proto
             except (OSError, SocksError, SocksConnectionError) as e:
