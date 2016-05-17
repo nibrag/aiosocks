@@ -16,6 +16,13 @@ class TestSocksConnector(unittest.TestCase):
     def tearDown(self):
         self.loop.close()
 
+    def test_properties(self):
+        addr = aiosocks.Socks4Addr('localhost')
+        auth = aiosocks.Socks4Auth('login')
+        conn = SocksConnector(addr, auth, loop=self.loop)
+        self.assertIs(conn.proxy, addr)
+        self.assertIs(conn.proxy_auth, auth)
+
     @mock.patch('aiosocks.connector.create_connection')
     def test_connect_proxy_ip(self, cr_conn_mock):
         tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
@@ -55,6 +62,24 @@ class TestSocksConnector(unittest.TestCase):
         self.assertTrue(connector._resolve_host.is_called)
         self.assertEqual(connector._resolve_host.call_count, 1)
         self.assertIs(conn._transport, tr)
+
+        conn.close()
+
+    @mock.patch('aiosocks.connector.create_connection')
+    def test_connect_remote_resolve(self, cr_conn_mock):
+        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
+        cr_conn_mock.side_effect = \
+            fake_coroutine((tr, proto)).side_effect
+
+        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
+        connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
+                                   None, loop=self.loop, remote_resolve=True)
+
+        connector._resolve_host = fake_coroutine([mock.MagicMock()])
+
+        conn = self.loop.run_until_complete(connector.connect(req))
+
+        self.assertEqual(connector._resolve_host.call_count, 0)
 
         conn.close()
 

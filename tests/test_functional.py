@@ -320,3 +320,49 @@ class TestSocksConnector(unittest.TestCase):
                     self.assertEqual(content, 'Test message')
 
                     resp.close()
+
+    def test_fingerprint_success(self):
+        with fake_socks4_srv(self.loop) as proxy_port:
+            addr = aiosocks.Socks4Addr('127.0.0.1', proxy_port)
+            fp = (b's\x93\xfd:\xed\x08\x1do\xa9\xaeq9'
+                  b'\x1a\xe3\xc5\x7f\x89\xe7l\xf9')
+
+            conn = SocksConnector(proxy=addr, proxy_auth=None, loop=self.loop,
+                                  remote_resolve=False, verify_ssl=False,
+                                  fingerprint=fp)
+
+            with http_srv(self.loop, use_ssl=True) as url:
+                with aiohttp.ClientSession(connector=conn,
+                                           loop=self.loop) as ses:
+                    @asyncio.coroutine
+                    def make_req():
+                        return (yield from ses.request('get', url=url))
+
+                    resp = self.loop.run_until_complete(make_req())
+
+                    self.assertEqual(resp.status, 200)
+
+                    content = self.loop.run_until_complete(resp.text())
+                    self.assertEqual(content, 'Test message')
+
+                    resp.close()
+
+    def test_fingerprint_fail(self):
+        with fake_socks4_srv(self.loop) as proxy_port:
+            addr = aiosocks.Socks4Addr('127.0.0.1', proxy_port)
+            fp = (b's\x93\xfd:\xed\x08\x1do\xa9\xaeq9'
+                  b'\x1a\xe3\xc5\x7f\x89\xe7l\x10')
+
+            conn = SocksConnector(proxy=addr, proxy_auth=None, loop=self.loop,
+                                  remote_resolve=False, verify_ssl=False,
+                                  fingerprint=fp)
+
+            with http_srv(self.loop, use_ssl=True) as url:
+                with aiohttp.ClientSession(connector=conn,
+                                           loop=self.loop) as ses:
+                    @asyncio.coroutine
+                    def make_req():
+                        return (yield from ses.request('get', url=url))
+
+                    with self.assertRaises(aiohttp.FingerprintMismatch):
+                        self.loop.run_until_complete(make_req())
