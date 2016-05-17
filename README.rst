@@ -57,6 +57,13 @@ direct usage
     # use socks protocol
     transport, protocol = await aiosocks.create_connection(
         None, proxy=socks4_addr, proxy_auth=None, dst=dst)
+
+    # StreamReader, StreamWriter
+    reader, writer = await aiosocks.open_connection(
+      proxy=socks5_addr, proxy_auth=socks5_auth, dst=dst, remote_resolve=True)
+
+    data = await reader.read(10)
+    writer.write('data')
   
   
   if __name__ == '__main__':
