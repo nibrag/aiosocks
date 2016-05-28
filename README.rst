@@ -22,6 +22,22 @@ TODO
 - UDP associate
 - TCP port binding
 
+Installation
+------------
+You can install it using Pip:
+
+.. code-block::
+
+  pip install aiosocks
+
+If you want the latest development version, you can install it from source:
+
+.. code-block::
+
+  git clone git@github.com:nibrag/aiosocks.git
+  cd aiosocks
+  python setup.py install
+
 Usage
 -----
 direct usage
