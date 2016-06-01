@@ -1,6 +1,8 @@
 from collections import namedtuple
+from aiohttp.helpers import BasicAuth as HttpProxyAuth
 
-__all__ = ('Socks4Auth', 'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksAddr')
+__all__ = ('Socks4Auth', 'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksAddr',
+           'HttpProxyAddr', 'HttpProxyAuth')
 
 
 class Socks4Auth(namedtuple('Socks4Auth', ['login', 'encoding'])):
@@ -41,3 +43,10 @@ class Socks4Addr(SocksAddr):
 
 class Socks5Addr(SocksAddr):
     pass
+
+
+class HttpProxyAddr(namedtuple('HttpProxyAddr', ['url'])):
+    def __new__(cls, url):
+        if url is None:
+            raise ValueError('None is not allowed as url value')
+        return super().__new__(cls, url)

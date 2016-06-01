@@ -4,6 +4,7 @@ import aiohttp
 import ipaddress
 from aiohttp.errors import ProxyConnectionError
 from .errors import SocksError, SocksConnectionError
+from .helpers import HttpProxyAddr, SocksAddr
 from . import create_connection
 
 __all__ = ('SocksConnector',)
@@ -108,3 +109,13 @@ class SocksConnector(aiohttp.TCPConnector):
                 raise aiohttp.ClientOSError(
                     exc.errno, 'Can not connect to %s:%s [%s]' %
                                (req.host, req.port, exc.strerror)) from exc
+
+
+def proxy_connector(proxy, proxy_auth=None, **kwargs):
+    if isinstance(proxy, HttpProxyAddr):
+        return aiohttp.ProxyConnector(
+            proxy.url, proxy_auth=proxy_auth, **kwargs)
+    elif isinstance(proxy, SocksAddr):
+        return SocksConnector(proxy, proxy_auth, **kwargs)
+    else:
+        raise ValueError('Unsupported `proxy` format')

@@ -114,7 +114,7 @@ aiohttp usage
   import asyncio
   import aiohttp
   import aiosocks
-  from aiosocks.connector import SocksConnector
+  from aiosocks.connector import SocksConnector, proxy_connector
 
 
   async def load_github_main():
@@ -122,10 +122,20 @@ aiohttp usage
     auth = aiosocks.Socks5Auth('proxyuser1', password='pwd')
 
     # remote resolve
-    # conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=True)
+    conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=True)
 
     # or locale resolve
     conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=False)
+
+    # or use shortcut function for automatically create
+    # SocksConnector/aiohttp.ProxyConnector (socks or http proxy)
+    conn = proxy_connector(aiosocks.SocksAddr(...),
+                           remote_resolve=True, verify_ssl=False)
+    # return SocksConnector
+
+    conn = proxy_connector(aiosocks.HttpProxyAddr('http://proxy'),
+                           aiosocks.HttpProxyAuth('login', 'pwd'))
+    # return aiohttp.ProxyConnector (http proxy connector)
 
     try:
       with aiohttp.ClientSession(connector=conn) as ses:
