@@ -53,6 +53,7 @@ def make_socks5(loop, *, addr=None, auth=None, rr=True, dst=None, r=None,
         proxy=addr, proxy_auth=auth, dst=dst, remote_resolve=rr,
         loop=loop, app_protocol_factory=ap_factory, waiter=whiter)
     proto._stream_writer = mock.Mock()
+    proto._stream_writer.drain = fake_coroutine(True)
 
     if not isinstance(r, (list, tuple)):
         proto.read_response = mock.Mock(
@@ -526,37 +527,40 @@ class TestSocks5Protocol(unittest.TestCase):
         req = proto.authenticate()
         self.loop.run_until_complete(req)
 
-    def test_wr_addr_ipv4(self):
+    def test_build_dst_addr_ipv4(self):
         proto = make_socks5(self.loop)
-        req = proto.write_address('127.0.0.1', 80)
-        self.loop.run_until_complete(req)
+        c = proto.build_dst_address('127.0.0.1', 80)
+        dst_req, resolved = self.loop.run_until_complete(c)
 
-        proto._stream_writer.write.assert_called_with(
-            b'\x01\x7f\x00\x00\x01\x00P')
+        self.assertEqual(dst_req, [0x01, b'\x7f\x00\x00\x01', b'\x00P'])
+        self.assertEqual(resolved, ('127.0.0.1', 80))
 
-    def test_wr_addr_ipv6(self):
+    def test_build_dst_addr_ipv6(self):
         proto = make_socks5(self.loop)
-        req = proto.write_address(
+        c = proto.build_dst_address(
             '2001:0db8:11a3:09d7:1f34:8a2e:07a0:765d', 80)
-        self.loop.run_until_complete(req)
+        dst_req, resolved = self.loop.run_until_complete(c)
 
-        proto._stream_writer.write.assert_called_with(
-            b'\x04 \x01\r\xb8\x11\xa3\t\xd7\x1f4\x8a.\x07\xa0v]\x00P')
+        self.assertEqual(dst_req, [
+            0x04, b' \x01\r\xb8\x11\xa3\t\xd7\x1f4\x8a.\x07\xa0v]', b'\x00P'])
+        self.assertEqual(resolved,
+                         ('2001:0db8:11a3:09d7:1f34:8a2e:07a0:765d', 80))
 
-    def test_wr_addr_domain_with_remote_resolve(self):
+    def test_build_dst_addr_domain_with_remote_resolve(self):
         proto = make_socks5(self.loop)
-        req = proto.write_address('python.org', 80)
-        self.loop.run_until_complete(req)
+        c = proto.build_dst_address('python.org', 80)
+        dst_req, resolved = self.loop.run_until_complete(c)
 
-        proto._stream_writer.write.assert_called_with(b'\x03\npython.org\x00P')
+        self.assertEqual(dst_req, [0x03, b'\n', b'python.org', b'\x00P'])
+        self.assertEqual(resolved, ('python.org', 80))
 
-    def test_wr_addr_domain_with_locale_resolve(self):
+    def test_build_dst_addr_domain_with_locale_resolve(self):
         proto = make_socks5(self.loop, rr=False)
-        req = proto.write_address('python.org', 80)
-        self.loop.run_until_complete(req)
+        c = proto.build_dst_address('python.org', 80)
+        dst_req, resolved = self.loop.run_until_complete(c)
 
-        proto._stream_writer.write.assert_called_with(
-            b'\x01\x7f\x00\x00\x01\x00P')
+        self.assertEqual(dst_req, [0x01, b'\x7f\x00\x00\x01', b'\x00P'])
+        self.assertEqual(resolved, ('127.0.0.1', 80))
 
     def test_rd_addr_ipv4(self):
         proto = make_socks5(
@@ -624,6 +628,5 @@ class TestSocks5Protocol(unittest.TestCase):
         self.assertEqual(req.result(), (('python.org', 80), ('127.0.0.1', 80)))
         proto._stream_writer.write.assert_has_calls([
             mock.call(b'\x05\x02\x00\x02'),
-            mock.call(b'\x05\x01\x00'),
-            mock.call(b'\x03\npython.org\x00P')
+            mock.call(b'\x05\x01\x00\x03\npython.org\x00P')
         ])

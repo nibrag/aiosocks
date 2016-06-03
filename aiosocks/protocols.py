@@ -284,9 +284,9 @@ class Socks5Protocol(BaseSocksProtocol):
         yield from self.authenticate()
 
         # build and send command
-        self.write_request([c.SOCKS_VER5, cmd, c.RSV])
-        resolved = yield from self.write_address(self._dst_host,
-                                                 self._dst_port)
+        dst_addr, resolved = yield from self.build_dst_address(
+            self._dst_host, self._dst_port)
+        self.write_request([c.SOCKS_VER5, cmd, c.RSV] + dst_addr)
 
         # read/process command response
         resp = yield from self.read_response(3)
@@ -348,7 +348,7 @@ class Socks5Protocol(BaseSocksProtocol):
                 )
 
     @asyncio.coroutine
-    def write_address(self, host, port):
+    def build_dst_address(self, host, port):
         family_to_byte = {socket.AF_INET: c.SOCKS5_ATYP_IPv4,
                           socket.AF_INET6: c.SOCKS5_ATYP_IPv6}
         port_bytes = struct.pack('>H', port)
@@ -359,8 +359,7 @@ class Socks5Protocol(BaseSocksProtocol):
             try:
                 host_bytes = socket.inet_pton(family, host)
                 req = [family_to_byte[family], host_bytes, port_bytes]
-                self.write_request(req)
-                return host, port
+                return req, (host, port)
             except socket.error:
                 pass
 
@@ -375,8 +374,7 @@ class Socks5Protocol(BaseSocksProtocol):
             req = [family_to_byte[family], host_bytes, port_bytes]
             host = socket.inet_ntop(family, host_bytes)
 
-        self.write_request(req)
-        return host, port
+        return req, (host, port)
 
     @asyncio.coroutine
     def read_address(self):
