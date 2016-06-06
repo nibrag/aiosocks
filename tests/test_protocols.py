@@ -310,6 +310,15 @@ class TestBaseSocksProtocol(unittest.TestCase):
                                   loop=self.loop)
         self.assertEqual(proto.reader._limit, 15)
 
+    def test_incomplete_error(self):
+        proto = BaseSocksProtocol(None, None, ('python.org', 80),
+                                  None, None, reader_limit=10,
+                                  loop=self.loop)
+        proto._stream_reader.readexactly = fake_coroutine(
+            asyncio.IncompleteReadError(b'part', 5))
+        with self.assertRaises(aiosocks.InvalidServerReply):
+            self.loop.run_until_complete(proto.read_response(4))
+
 
 class TestSocks4Protocol(unittest.TestCase):
     def setUp(self):

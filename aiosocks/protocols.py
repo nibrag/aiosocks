@@ -150,7 +150,11 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
 
     @asyncio.coroutine
     def read_response(self, n):
-        return (yield from self._stream_reader.readexactly(n))
+        try:
+            return (yield from self._stream_reader.readexactly(n))
+        except asyncio.IncompleteReadError as e:
+            raise InvalidServerReply(
+                'Server sent fewer bytes than required (%s)' % str(e))
 
     @asyncio.coroutine
     def _get_dst_addr(self):
