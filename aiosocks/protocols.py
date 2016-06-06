@@ -150,7 +150,7 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
 
     @asyncio.coroutine
     def read_response(self, n):
-        return (yield from self._stream_reader.read(n))
+        return (yield from self._stream_reader.readexactly(n))
 
     @asyncio.coroutine
     def _get_dst_addr(self):
