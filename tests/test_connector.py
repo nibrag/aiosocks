@@ -80,7 +80,7 @@ class TestSocksConnector(unittest.TestCase):
 
         conn = self.loop.run_until_complete(connector.connect(req))
 
-        self.assertEqual(connector._resolve_host.call_count, 0)
+        self.assertEqual(connector._resolve_host.call_count, 1)
 
         conn.close()
 

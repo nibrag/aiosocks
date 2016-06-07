@@ -1,7 +1,5 @@
-import socket
 import asyncio
 import aiohttp
-import ipaddress
 from aiohttp.errors import ProxyConnectionError
 from .errors import SocksError, SocksConnectionError
 from .helpers import HttpProxyAddr, SocksAddr
@@ -65,22 +63,8 @@ class SocksConnector(aiohttp.TCPConnector):
         else:
             dst = req.host, req.port
 
-        # if self._resolver is AsyncResolver and self._proxy.host
-        # is ip address, then aiodns raise DNSError.
-        # https://github.com/KeepSafe/aiohttp/pull/874. Fix:
-        try:
-            ipaddress.ip_address(self._proxy.host)
-            proxy_hosts = yield from self._loop.getaddrinfo(self._proxy.host,
-                                                            self._proxy.port)
-            family, _, proto, _, address = proxy_hosts[0]
-
-            proxy_hosts = ({'hostname': self._proxy.host,
-                            'host': address[0], 'port': address[1],
-                            'family': family, 'proto': proto,
-                            'flags': socket.AI_NUMERICHOST},)
-        except ValueError:
-            proxy_hosts = yield from self._resolve_host(self._proxy.host,
-                                                        self._proxy.port)
+        proxy_hosts = yield from self._resolve_host(self._proxy.host,
+                                                    self._proxy.port)
         exc = None
 
         for hinfo in proxy_hosts:
