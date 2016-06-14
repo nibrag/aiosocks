@@ -73,23 +73,32 @@ direct usage
     # use socks protocol
     transport, protocol = await aiosocks.create_connection(
         None, proxy=socks4_addr, proxy_auth=None, dst=dst)
-
-    # StreamReader, StreamWriter
-    reader, writer = await aiosocks.open_connection(
-      proxy=socks5_addr, proxy_auth=socks5_auth, dst=dst, remote_resolve=True)
-
-    data = await reader.read(10)
-    writer.write('data')
-  
   
   if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(connect())
     loop.close()
 
+
+**A wrapper for create_connection() returning a (reader, writer) pair**
+
+.. code-block:: python
+
+    # StreamReader, StreamWriter
+    reader, writer = await aiosocks.open_connection(
+        proxy=socks5_addr, proxy_auth=socks5_auth, dst=dst, remote_resolve=True)
+
+    data = await reader.read(10)
+    writer.write('data')
+
 error handling
 ^^^^^^^^^^^^^^
 
+`SocksError` is a base class for:
+    - `NoAcceptableAuthMethods`
+    - `LoginAuthenticationFailed`
+    - `InvalidServerVersion`
+    - `InvalidServerReply`
 .. code-block:: python
 
     try:
@@ -105,6 +114,18 @@ error handling
       # something wrong
     except aiosocks.SocksError:
       # something other
+
+or
+
+.. code-block:: python
+
+    try:
+      transport, protocol = await aiosocks.create_connection(
+          lambda: Protocol, proxy=socks5_addr, proxy_auth=socks5_auth, dst=dst)
+    except aiosocks.SocksConnectionError:
+        # connection error
+    except aiosocks.SocksError:
+        # socks error
 
 aiohttp usage
 ^^^^^^^^^^^^^
