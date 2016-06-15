@@ -99,6 +99,7 @@ error handling
     - `LoginAuthenticationFailed`
     - `InvalidServerVersion`
     - `InvalidServerReply`
+
 .. code-block:: python
 
     try:
