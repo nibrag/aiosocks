@@ -2,10 +2,9 @@ import unittest
 import asyncio
 import aiosocks
 import aiohttp
-import pytest
 from unittest import mock
 from aiohttp.client_reqrep import ClientRequest
-from aiosocks.connector import SocksConnector, proxy_connector
+from aiosocks.connector import SocksConnector, proxy_connector, HttpProxyAddr
 from .helpers import fake_coroutine
 
 
@@ -133,18 +132,24 @@ class TestSocksConnector(unittest.TestCase):
         with self.assertRaises(aiosocks.SocksError):
             self.loop.run_until_complete(connector.connect(req))
 
+    def test_proxy_connector(self):
+        socks4_addr = aiosocks.Socks4Addr('h')
+        socks5_addr = aiosocks.Socks5Addr('h')
+        http_addr = HttpProxyAddr('http://proxy')
 
-def test_proxy_connector():
-    socks4_addr = aiosocks.Socks4Addr('h')
-    socks5_addr = aiosocks.Socks5Addr('h')
-    http_addr = aiosocks.HttpProxyAddr('http://proxy')
+        self.assertIsInstance(proxy_connector(socks4_addr, loop=self.loop),
+                              SocksConnector)
+        self.assertIsInstance(proxy_connector(socks5_addr, loop=self.loop),
+                              SocksConnector)
+        self.assertIsInstance(proxy_connector(http_addr, loop=self.loop),
+                              aiohttp.ProxyConnector)
 
-    loop = asyncio.new_event_loop()
+        with self.assertRaises(ValueError):
+            proxy_connector(None)
 
-    assert isinstance(proxy_connector(socks4_addr, loop=loop), SocksConnector)
-    assert isinstance(proxy_connector(socks5_addr, loop=loop), SocksConnector)
-    assert isinstance(proxy_connector(http_addr, loop=loop),
-                      aiohttp.ProxyConnector)
+    def test_http_proxy_addr(self):
+        addr = HttpProxyAddr('http://proxy')
+        self.assertEqual(addr.url, 'http://proxy')
 
-    with pytest.raises(ValueError):
-        proxy_connector(None)
+        with self.assertRaises(ValueError):
+            HttpProxyAddr(None)

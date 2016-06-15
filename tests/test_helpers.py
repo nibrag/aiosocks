@@ -83,11 +83,3 @@ def test_socks5_addr4():
     addr = aiosocks.Socks5Addr('localhost', None)
     assert addr.host == 'localhost'
     assert addr.port == 1080
-
-
-def test_http_proxy_addr():
-    addr = aiosocks.HttpProxyAddr('http://proxy')
-    assert addr.url == 'http://proxy'
-
-    with pytest.raises(ValueError):
-        aiosocks.HttpProxyAddr(None)

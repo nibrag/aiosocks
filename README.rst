@@ -135,7 +135,9 @@ aiohttp usage
   import asyncio
   import aiohttp
   import aiosocks
-  from aiosocks.connector import SocksConnector, proxy_connector
+  from aiosocks.connector import (
+    SocksConnector, proxy_connector, HttpProxyAddr, HttpProxyAuth
+  )
 
 
   async def load_github_main():
@@ -154,8 +156,8 @@ aiohttp usage
                            remote_resolve=True, verify_ssl=False)
     # return SocksConnector
 
-    conn = proxy_connector(aiosocks.HttpProxyAddr('http://proxy'),
-                           aiosocks.HttpProxyAuth('login', 'pwd'))
+    conn = proxy_connector(HttpProxyAddr('http://proxy'),
+                           HttpProxyAuth('login', 'pwd'))
     # return aiohttp.ProxyConnector (http proxy connector)
 
     try:

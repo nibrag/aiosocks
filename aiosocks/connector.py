@@ -1,11 +1,24 @@
+try:
+    import aiohttp
+    from aiohttp.errors import ProxyConnectionError
+    from aiohttp.helpers import BasicAuth as HttpProxyAuth
+except ImportError:
+    raise ImportError('aiosocks.SocksConnector require aiohttp library')
+
 import asyncio
-import aiohttp
-from aiohttp.errors import ProxyConnectionError
+from collections import namedtuple
 from .errors import SocksError, SocksConnectionError
-from .helpers import HttpProxyAddr, SocksAddr
+from .helpers import SocksAddr
 from . import create_connection
 
-__all__ = ('SocksConnector',)
+__all__ = ('SocksConnector', 'HttpProxyAddr', 'HttpProxyAuth')
+
+
+class HttpProxyAddr(namedtuple('HttpProxyAddr', ['url'])):
+    def __new__(cls, url):
+        if url is None:
+            raise ValueError('None is not allowed as url value')
+        return super().__new__(cls, url)
 
 
 class SocksConnector(aiohttp.TCPConnector):

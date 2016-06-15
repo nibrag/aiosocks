@@ -4,19 +4,17 @@ from .errors import (
     SocksConnectionError, InvalidServerReply, InvalidServerVersion
 )
 from .helpers import (
-    SocksAddr, Socks4Addr, Socks5Addr, Socks4Auth,
-    Socks5Auth, HttpProxyAddr, HttpProxyAuth
+    SocksAddr, Socks4Addr, Socks5Addr, Socks4Auth, Socks5Auth
 )
 from .protocols import Socks4Protocol, Socks5Protocol, DEFAULT_LIMIT
 
 __version__ = '0.1.5'
 
 __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
-           'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'HttpProxyAddr',
-           'HttpProxyAuth', 'SocksError', 'NoAcceptableAuthMethods',
-           'LoginAuthenticationFailed', 'SocksConnectionError',
-           'InvalidServerVersion', 'InvalidServerReply',
-           'create_connection', 'open_connection')
+           'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
+           'NoAcceptableAuthMethods', 'LoginAuthenticationFailed',
+           'SocksConnectionError', 'InvalidServerVersion',
+           'InvalidServerReply', 'create_connection', 'open_connection')
 
 
 @asyncio.coroutine
