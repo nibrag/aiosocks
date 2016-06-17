@@ -137,7 +137,7 @@ aiohttp usage
   import aiohttp
   import aiosocks
   from aiosocks.connector import (
-    SocksConnector, proxy_connector, HttpProxyAddr, HttpProxyAuth
+    SocksConnector, HttpProxyAddr, HttpProxyAuth
   )
 
 
@@ -150,16 +150,6 @@ aiohttp usage
 
     # or locale resolve
     conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=False)
-
-    # or use shortcut function for automatically create
-    # SocksConnector/aiohttp.ProxyConnector (socks or http proxy)
-    conn = proxy_connector(aiosocks.SocksAddr(...),
-                           remote_resolve=True, verify_ssl=False)
-    # return SocksConnector
-
-    conn = proxy_connector(HttpProxyAddr('http://proxy'),
-                           HttpProxyAuth('login', 'pwd'))
-    # return aiohttp.ProxyConnector (http proxy connector)
 
     try:
       with aiohttp.ClientSession(connector=conn) as ses:
@@ -176,3 +166,26 @@ aiohttp usage
     loop = asyncio.get_event_loop()
     loop.run_until_complete(load_github_main())
     loop.close()
+
+proxy_connector
+^^^^^^^^^^^^^^^
+A unified method to create `connector`.
+
+.. code-block:: python
+
+    import asyncio
+    import aiohttp
+    import aiosocks
+    from aiosocks.connector import (
+        proxy_connector, HttpProxyAddr, HttpProxyAuth
+    )
+
+    # make SocksConnector
+    conn = proxy_connector(aiosocks.Socks5Addr(...),
+                           remote_resolve=True, verify_ssl=False)
+    # return SocksConnector instance
+
+    # make aiohttp.ProxyConnector (http proxy)
+    conn = proxy_connector(HttpProxyAddr('http://proxy'),
+                           HttpProxyAuth('login', 'pwd'), verify_ssl=True)
+    # return aiohttp.ProxyConnector instance
