@@ -152,7 +152,7 @@ aiohttp usage
     conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=False)
 
     try:
-      with aiohttp.ClientSession(connector=conn) as ses:
+      with aiohttp.ClientSession(connector=conn) as session:
         async with session.get('http://github.com/') as resp:
           if resp.status == 200:
             print(await resp.text())
