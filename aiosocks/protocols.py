@@ -62,9 +62,11 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         except SocksError as exc:
             exc = SocksError('Can not connect to %s:%s. %s' %
                              (self._dst_host, self._dst_port, exc))
-            self._loop.call_soon(self._waiter.set_exception, exc)
+            if not self._waiter.cancelled():
+                self._loop.call_soon(self._waiter.set_exception, exc)
         except Exception as exc:
-            self._loop.call_soon(self._waiter.set_exception, exc)
+            if not self._waiter.cancelled():
+                self._loop.call_soon(self._waiter.set_exception, exc)
         else:
             self._negotiate_done = True
 
