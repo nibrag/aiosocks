@@ -1,6 +1,6 @@
 try:
     import aiohttp
-    from aiohttp.errors import ProxyConnectionError
+    from aiohttp.client_exceptions import ClientProxyConnectionError
     from aiohttp.helpers import BasicAuth as HttpProxyAuth
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
@@ -99,7 +99,7 @@ class SocksConnector(aiohttp.TCPConnector):
                 exc = e
         else:
             if isinstance(exc, SocksConnectionError):
-                raise ProxyConnectionError(*exc.args)
+                raise ClientProxyConnectionError(*exc.args)
             if isinstance(exc, SocksError):
                 raise exc
             else:
