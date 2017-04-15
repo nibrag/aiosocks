@@ -143,7 +143,7 @@ aiohttp usage
   import aiohttp
   import aiosocks
   from yarl import URL
-  from aiosocks.connector import ProxyConnecotr, ProxyClientRequest
+  from aiosocks.connector import ProxyConnector, ProxyClientRequest
 
 
   async def load_github_main():
