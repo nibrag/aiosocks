@@ -8,7 +8,7 @@ from .helpers import (
 )
 from .protocols import Socks4Protocol, Socks5Protocol, DEFAULT_LIMIT
 
-__version__ = '0.1.7'
+__version__ = '0.2.1'
 
 __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
@@ -17,11 +17,10 @@ __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'InvalidServerReply', 'create_connection', 'open_connection')
 
 
-@asyncio.coroutine
-def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
-                      remote_resolve=True, loop=None, ssl=None, family=0,
-                      proto=0, flags=0, sock=None, local_addr=None,
-                      server_hostname=None, reader_limit=DEFAULT_LIMIT):
+async def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
+                            remote_resolve=True, loop=None, ssl=None, family=0,
+                            proto=0, flags=0, sock=None, local_addr=None,
+                            server_hostname=None, reader_limit=DEFAULT_LIMIT):
     assert isinstance(proxy, SocksAddr), (
         'proxy must be Socks4Addr() or Socks5Addr() tuple'
     )
@@ -70,7 +69,7 @@ def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
                            reader_limit=reader_limit)
 
     try:
-        transport, protocol = yield from loop.create_connection(
+        transport, protocol = await loop.create_connection(
             socks_factory, proxy.host, proxy.port, family=family,
             proto=proto, flags=flags, sock=sock, local_addr=local_addr)
     except OSError as exc:
@@ -79,7 +78,7 @@ def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
             (exc.errno, proxy.host, proxy.port, exc.strerror)) from exc
 
     try:
-        yield from waiter
+        await waiter
     except:
         transport.close()
         raise
@@ -87,10 +86,9 @@ def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
     return protocol.app_transport, protocol.app_protocol
 
 
-@asyncio.coroutine
-def open_connection(proxy, proxy_auth, dst, *, remote_resolve=True,
-                    loop=None, limit=DEFAULT_LIMIT, **kwds):
-    _, protocol = yield from create_connection(
+async def open_connection(proxy, proxy_auth, dst, *, remote_resolve=True,
+                          loop=None, limit=DEFAULT_LIMIT, **kwds):
+    _, protocol = await create_connection(
         None, proxy, proxy_auth, dst, reader_limit=limit,
         remote_resolve=remote_resolve, loop=loop, **kwds)
 
