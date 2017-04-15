@@ -20,7 +20,7 @@ aiohttp 2.0+
 Features
 --------
 - SOCKS4, SOCKS4a and SOCKS5 version
-- SocksConnector for aiohttp
+- ProxyConnector for aiohttp
 - SOCKS "CONNECT" command
 
 TODO
@@ -152,10 +152,10 @@ aiohttp usage
     ba = aiohttp.BasicAuth('login')
 
     # remote resolve
-    conn = ProxyConnecotr(remote_resolve=True)
+    conn = ProxyConnector(remote_resolve=True)
 
     # or locale resolve
-    conn = SocksConnector(remote_resolve=False)
+    conn = ProxyConnector(remote_resolve=False)
 
     try:
       with aiohttp.ClientSession(connector=conn, request_class=ProxyClientRequest) as session:
