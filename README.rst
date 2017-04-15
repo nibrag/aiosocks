@@ -142,7 +142,6 @@ aiohttp usage
   import asyncio
   import aiohttp
   import aiosocks
-  from yarl import URL
   from aiosocks.connector import ProxyConnector, ProxyClientRequest
 
 
@@ -160,19 +159,19 @@ aiohttp usage
     try:
       with aiohttp.ClientSession(connector=conn, request_class=ProxyClientRequest) as session:
         # socks5 proxy
-        async with session.get('http://github.com/', proxy=URL('socks5://127.0.0.1:1080'),
+        async with session.get('http://github.com/', proxy='socks5://127.0.0.1:1080',
                                proxy_auth=auth5) as resp:
           if resp.status == 200:
             print(await resp.text())
 
         # socks4 proxy
-        async with session.get('http://github.com/', proxy=URL('socks4://127.0.0.1:1081'),
+        async with session.get('http://github.com/', proxy='socks4://127.0.0.1:1081',
                                proxy_auth=auth4) as resp:
           if resp.status == 200:
             print(await resp.text())
 
         # http proxy
-        async with session.get('http://github.com/', proxy=URL('http://127.0.0.1:8080'),
+        async with session.get('http://github.com/', proxy='http://127.0.0.1:8080',
                                proxy_auth=ba) as resp:
           if resp.status == 200:
             print(await resp.text())
