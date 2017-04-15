@@ -1,155 +1,179 @@
-import unittest
-import asyncio
 import aiosocks
 import aiohttp
+import pytest
+from yarl import URL
 from unittest import mock
-from aiohttp.client_reqrep import ClientRequest
-from aiosocks.connector import SocksConnector, proxy_connector, HttpProxyAddr
-from .helpers import fake_coroutine
+from aiohttp.test_utils import make_mocked_coro
+from aiohttp import BasicAuth
+from aiosocks.connector import ProxyConnector, ProxyClientRequest
+from aiosocks.helpers import Socks4Auth, Socks5Auth
 
 
-class TestSocksConnector(unittest.TestCase):
-    def setUp(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(None)
+async def test_connect_proxy_ip():
+    tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
 
-    def tearDown(self):
-        self.loop.close()
+    with mock.patch('aiosocks.connector.create_connection',
+                    make_mocked_coro((tr, proto))):
+        loop_mock = mock.Mock()
+        loop_mock.getaddrinfo = make_mocked_coro(
+            [[0, 0, 0, 0, ['127.0.0.1', 1080]]])
 
-    def test_properties(self):
-        addr = aiosocks.Socks4Addr('localhost')
-        auth = aiosocks.Socks4Auth('login')
-        conn = SocksConnector(addr, auth, loop=self.loop)
-        self.assertIs(conn.proxy, addr)
-        self.assertIs(conn.proxy_auth, auth)
+        req = ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop_mock,
+            proxy=URL('socks5://proxy.org'))
+        connector = ProxyConnector(loop=loop_mock)
+        conn = await connector.connect(req)
 
-    @mock.patch('aiosocks.connector.create_connection')
-    def test_connect_proxy_ip(self, cr_conn_mock):
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        cr_conn_mock.side_effect = \
-            fake_coroutine((tr, proto)).side_effect
+    assert loop_mock.getaddrinfo.called
+    assert conn.protocol is proto
 
+    conn.close()
+
+
+async def test_connect_proxy_domain():
+    tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
+
+    with mock.patch('aiosocks.connector.create_connection',
+                    make_mocked_coro((tr, proto))):
         loop_mock = mock.Mock()
 
-        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
-        connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
-                                   None, loop=loop_mock)
+        req = ProxyClientRequest(
+            'GET', URL('http://python.org'),  loop=loop_mock,
+            proxy=URL('socks5://proxy.example'))
+        connector = ProxyConnector(loop=loop_mock)
 
-        loop_mock.getaddrinfo = fake_coroutine([mock.MagicMock()])
+        connector._resolve_host = make_mocked_coro([mock.MagicMock()])
+        conn = await connector.connect(req)
 
-        conn = self.loop.run_until_complete(connector.connect(req))
+    assert connector._resolve_host.call_count == 1
+    assert conn.protocol is proto
 
-        self.assertTrue(loop_mock.getaddrinfo.is_called)
-        self.assertIs(conn._transport, tr)
+    conn.close()
 
-        conn.close()
 
-    @mock.patch('aiosocks.connector.create_connection')
-    def test_connect_proxy_domain(self, cr_conn_mock):
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        cr_conn_mock.side_effect = \
-            fake_coroutine((tr, proto)).side_effect
-        loop_mock = mock.Mock()
+async def test_connect_remote_resolve(loop):
+    tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
 
-        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
-        connector = SocksConnector(aiosocks.Socks5Addr('proxy.example'),
-                                   None, loop=loop_mock)
+    with mock.patch('aiosocks.connector.create_connection',
+                    make_mocked_coro((tr, proto))):
+        req = ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('socks5://127.0.0.1'))
+        connector = ProxyConnector(loop=loop, remote_resolve=True)
+        connector._resolve_host = make_mocked_coro([mock.MagicMock()])
 
-        connector._resolve_host = fake_coroutine([mock.MagicMock()])
+        conn = await connector.connect(req)
 
-        conn = self.loop.run_until_complete(connector.connect(req))
+    assert connector._resolve_host.call_count == 1
+    assert conn.protocol is proto
 
-        self.assertTrue(connector._resolve_host.is_called)
-        self.assertEqual(connector._resolve_host.call_count, 1)
-        self.assertIs(conn._transport, tr)
+    conn.close()
 
-        conn.close()
 
-    @mock.patch('aiosocks.connector.create_connection')
-    def test_connect_remote_resolve(self, cr_conn_mock):
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        cr_conn_mock.side_effect = \
-            fake_coroutine((tr, proto)).side_effect
+async def test_connect_locale_resolve(loop):
+    tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
 
-        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
-        connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
-                                   None, loop=self.loop, remote_resolve=True)
+    with mock.patch('aiosocks.connector.create_connection',
+                    make_mocked_coro((tr, proto))):
+        req = ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('socks5://proxy.example'))
+        connector = ProxyConnector(loop=loop, remote_resolve=False)
+        connector._resolve_host = make_mocked_coro([mock.MagicMock()])
 
-        connector._resolve_host = fake_coroutine([mock.MagicMock()])
+        conn = await connector.connect(req)
 
-        conn = self.loop.run_until_complete(connector.connect(req))
+    assert connector._resolve_host.call_count == 2
+    assert conn.protocol is proto
 
-        self.assertEqual(connector._resolve_host.call_count, 1)
+    conn.close()
 
-        conn.close()
 
-    @mock.patch('aiosocks.connector.create_connection')
-    def test_connect_locale_resolve(self, cr_conn_mock):
-        tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
-        cr_conn_mock.side_effect = \
-            fake_coroutine((tr, proto)).side_effect
+async def test_proxy_connect_fail(loop):
+    loop_mock = mock.Mock()
+    loop_mock.getaddrinfo = make_mocked_coro(
+        [[0, 0, 0, 0, ['127.0.0.1', 1080]]])
+    cc_coro = make_mocked_coro(
+        raise_exception=aiosocks.SocksConnectionError())
 
-        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
-        connector = SocksConnector(aiosocks.Socks5Addr('proxy.example'),
-                                   None, loop=self.loop, remote_resolve=False)
+    with mock.patch('aiosocks.connector.create_connection', cc_coro):
+        req = ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('socks5://127.0.0.1'))
+        connector = ProxyConnector(loop=loop_mock)
 
-        connector._resolve_host = fake_coroutine([mock.MagicMock()])
+        with pytest.raises(aiohttp.ClientConnectionError):
+            await connector.connect(req)
 
-        conn = self.loop.run_until_complete(connector.connect(req))
 
-        self.assertTrue(connector._resolve_host.is_called)
-        self.assertEqual(connector._resolve_host.call_count, 2)
+async def test_proxy_negotiate_fail(loop):
+    loop_mock = mock.Mock()
+    loop_mock.getaddrinfo = make_mocked_coro(
+        [[0, 0, 0, 0, ['127.0.0.1', 1080]]])
 
-        conn.close()
+    with mock.patch('aiosocks.connector.create_connection',
+                    make_mocked_coro(raise_exception=aiosocks.SocksError())):
+        req = ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('socks5://127.0.0.1'))
+        connector = ProxyConnector(loop=loop_mock)
 
-    @mock.patch('aiosocks.connector.create_connection')
-    def test_proxy_connect_fail(self, cr_conn_mock):
-        loop_mock = mock.Mock()
-        cr_conn_mock.side_effect = \
-            fake_coroutine(aiosocks.SocksConnectionError()).side_effect
+        with pytest.raises(aiosocks.SocksError):
+            await connector.connect(req)
 
-        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
-        connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
-                                   None, loop=loop_mock)
 
-        loop_mock.getaddrinfo = fake_coroutine([mock.MagicMock()])
+async def test_proxy_connect_http(loop):
+    tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
+    loop_mock = mock.Mock()
+    loop_mock.getaddrinfo = make_mocked_coro([
+        [0, 0, 0, 0, ['127.0.0.1', 1080]]])
+    loop_mock.create_connection = make_mocked_coro((tr, proto))
 
-        with self.assertRaises(aiohttp.ProxyConnectionError):
-            self.loop.run_until_complete(connector.connect(req))
+    req = ProxyClientRequest(
+        'GET', URL('http://python.org'), loop=loop,
+        proxy=URL('http://127.0.0.1'))
+    connector = ProxyConnector(loop=loop_mock)
 
-    @mock.patch('aiosocks.connector.create_connection')
-    def test_proxy_negotiate_fail(self, cr_conn_mock):
-        loop_mock = mock.Mock()
-        cr_conn_mock.side_effect = \
-            fake_coroutine(aiosocks.SocksError()).side_effect
+    await connector.connect(req)
 
-        req = ClientRequest('GET', 'http://python.org', loop=self.loop)
-        connector = SocksConnector(aiosocks.Socks5Addr('127.0.0.1'),
-                                   None, loop=loop_mock)
 
-        loop_mock.getaddrinfo = fake_coroutine([mock.MagicMock()])
+@pytest.mark.parametrize('proxy', [
+    (URL('socks4://proxy.org'), Socks4Auth('login')),
+    (URL('socks5://proxy.org'), Socks5Auth('login', 'password')),
+    (URL('http://proxy.org'), BasicAuth('login')), (None, BasicAuth('login')),
+    (URL('socks4://proxy.org'), None), (None, None)])
+def test_proxy_client_request_valid(proxy, loop):
+    proxy, proxy_auth = proxy
+    p = ProxyClientRequest('GET', URL('http://python.org'),
+                           proxy=proxy, proxy_auth=proxy_auth, loop=loop)
+    assert p.proxy is proxy
+    assert p.proxy_auth is proxy_auth
 
-        with self.assertRaises(aiosocks.SocksError):
-            self.loop.run_until_complete(connector.connect(req))
 
-    def test_proxy_connector(self):
-        socks4_addr = aiosocks.Socks4Addr('h')
-        socks5_addr = aiosocks.Socks5Addr('h')
-        http_addr = HttpProxyAddr('http://proxy')
+def test_proxy_client_request_invalid(loop):
+    with pytest.raises(ValueError) as cm:
+        ProxyClientRequest(
+            'GET', URL('http://python.org'),
+            proxy=URL('socks6://proxy.org'), proxy_auth=None, loop=loop)
+    assert 'Only http, socks4 and socks5 proxies are supported' in str(cm)
 
-        self.assertIsInstance(proxy_connector(socks4_addr, loop=self.loop),
-                              SocksConnector)
-        self.assertIsInstance(proxy_connector(socks5_addr, loop=self.loop),
-                              SocksConnector)
-        self.assertIsInstance(proxy_connector(http_addr, loop=self.loop),
-                              aiohttp.ProxyConnector)
+    with pytest.raises(ValueError) as cm:
+        ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('http://proxy.org'), proxy_auth=Socks4Auth('l'))
+    assert 'proxy_auth must be None or BasicAuth() ' \
+           'tuple for http proxy' in str(cm)
 
-        with self.assertRaises(ValueError):
-            proxy_connector(None)
+    with pytest.raises(ValueError) as cm:
+        ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('socks4://proxy.org'), proxy_auth=BasicAuth('l'))
+    assert 'proxy_auth must be None or Socks4Auth() ' \
+           'tuple for socks4 proxy' in str(cm)
 
-    def test_http_proxy_addr(self):
-        addr = HttpProxyAddr('http://proxy')
-        self.assertEqual(addr.url, 'http://proxy')
-
-        with self.assertRaises(ValueError):
-            HttpProxyAddr(None)
+    with pytest.raises(ValueError) as cm:
+        ProxyClientRequest(
+            'GET', URL('http://python.org'), loop=loop,
+            proxy=URL('socks5://proxy.org'), proxy_auth=Socks4Auth('l'))
+    assert 'proxy_auth must be None or Socks5Auth() ' \
+           'tuple for socks5 proxy' in str(cm)

@@ -11,6 +11,12 @@ SOCKS proxy client for asyncio and aiohttp
 .. image:: https://badge.fury.io/py/aiosocks.svg
   :target: https://badge.fury.io/py/aiosocks
 
+
+Dependencies
+------------
+python 3.5+
+aiohttp 2.0+
+
 Features
 --------
 - SOCKS4, SOCKS4a and SOCKS5 version
@@ -136,56 +142,47 @@ aiohttp usage
   import asyncio
   import aiohttp
   import aiosocks
-  from aiosocks.connector import (
-    SocksConnector, HttpProxyAddr, HttpProxyAuth
-  )
+  from yarl import URL
+  from aiosocks.connector import ProxyConnecotr, ProxyClientRequest
 
 
   async def load_github_main():
-    addr = aiosocks.Socks5Addr('127.0.0.1', 1080)
-    auth = aiosocks.Socks5Auth('proxyuser1', password='pwd')
+    auth5 = aiosocks.Socks5Auth('proxyuser1', password='pwd')
+    auth4 = aiosocks.Socks4Auth('proxyuser1')
+    ba = aiohttp.BasicAuth('login')
 
     # remote resolve
-    conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=True)
+    conn = ProxyConnecotr(remote_resolve=True)
 
     # or locale resolve
-    conn = SocksConnector(proxy=addr, proxy_auth=auth, remote_resolve=False)
+    conn = SocksConnector(remote_resolve=False)
 
     try:
-      with aiohttp.ClientSession(connector=conn) as session:
-        async with session.get('http://github.com/') as resp:
+      with aiohttp.ClientSession(connector=conn, request_class=ProxyClientRequest) as session:
+        # socks5 proxy
+        async with session.get('http://github.com/', proxy=URL('socks5://127.0.0.1:1080'),
+                               proxy_auth=auth5) as resp:
+          if resp.status == 200:
+            print(await resp.text())
+
+        # socks4 proxy
+        async with session.get('http://github.com/', proxy=URL('socks4://127.0.0.1:1081'),
+                               proxy_auth=auth4) as resp:
+          if resp.status == 200:
+            print(await resp.text())
+
+        # http proxy
+        async with session.get('http://github.com/', proxy=URL('http://127.0.0.1:8080'),
+                               proxy_auth=ba) as resp:
           if resp.status == 200:
             print(await resp.text())
     except aiohttp.ProxyConnectionError:
       # connection problem
     except aiosocks.SocksError:
       # communication problem
-  
-  
+
+
   if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(load_github_main())
     loop.close()
-
-proxy_connector
-^^^^^^^^^^^^^^^
-A unified method to create `connector`.
-
-.. code-block:: python
-
-    import asyncio
-    import aiohttp
-    import aiosocks
-    from aiosocks.connector import (
-        proxy_connector, HttpProxyAddr, HttpProxyAuth
-    )
-
-    # make SocksConnector
-    conn = proxy_connector(aiosocks.Socks5Addr(...),
-                           remote_resolve=True, verify_ssl=False)
-    # return SocksConnector instance
-
-    # make aiohttp.ProxyConnector (http proxy)
-    conn = proxy_connector(HttpProxyAddr('http://proxy'),
-                           HttpProxyAuth('login', 'pwd'), verify_ssl=True)
-    # return aiohttp.ProxyConnector instance

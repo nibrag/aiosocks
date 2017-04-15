@@ -10,11 +10,6 @@ from .errors import (
     InvalidServerReply, InvalidServerVersion
 )
 
-try:
-    from asyncio import ensure_future
-except ImportError:
-    ensure_future = asyncio.async
-
 
 DEFAULT_LIMIT = getattr(asyncio.streams, '_DEFAULT_LIMIT', 2**16)
 
@@ -54,11 +49,10 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         super().__init__(stream_reader=reader,
                          client_connected_cb=self.negotiate, loop=self._loop)
 
-    @asyncio.coroutine
-    def negotiate(self, reader, writer):
+    async def negotiate(self, reader, writer):
         try:
             req = self.socks_request(c.SOCKS_CMD_CONNECT)
-            self._proxy_peername, self._proxy_sockname = yield from req
+            self._proxy_peername, self._proxy_sockname = await req
         except SocksError as exc:
             exc = SocksError('Can not connect to %s:%s. %s' %
                              (self._dst_host, self._dst_port, exc))
@@ -134,8 +128,7 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
             self._app_protocol.eof_received()
         super().eof_received()
 
-    @asyncio.coroutine
-    def socks_request(self, cmd):
+    async def socks_request(self, cmd):
         raise NotImplementedError
 
     def write_request(self, request):
@@ -150,17 +143,15 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
                 raise ValueError('Unsupported item')
         self._stream_writer.write(bdata)
 
-    @asyncio.coroutine
-    def read_response(self, n):
+    async def read_response(self, n):
         try:
-            return (yield from self._stream_reader.readexactly(n))
+            return (await self._stream_reader.readexactly(n))
         except asyncio.IncompleteReadError as e:
             raise InvalidServerReply(
                 'Server sent fewer bytes than required (%s)' % str(e))
 
-    @asyncio.coroutine
-    def _get_dst_addr(self):
-        infos = yield from self._loop.getaddrinfo(
+    async def _get_dst_addr(self):
+        infos = await self._loop.getaddrinfo(
             self._dst_host, self._dst_port, family=socket.AF_UNSPEC,
             type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP,
             flags=socket.AI_ADDRCONFIG)
@@ -227,8 +218,7 @@ class Socks4Protocol(BaseSocksProtocol):
                          reader_limit=reader_limit,
                          negotiate_done_cb=negotiate_done_cb)
 
-    @asyncio.coroutine
-    def socks_request(self, cmd):
+    async def socks_request(self, cmd):
         # prepare destination addr/port
         host, port = self._dst_host, self._dst_port
         port_bytes = struct.pack(b'>H', port)
@@ -242,7 +232,7 @@ class Socks4Protocol(BaseSocksProtocol):
                 include_hostname = True
             else:
                 # it's not an IP number, so it's probably a DNS name.
-                family, host = yield from self._get_dst_addr()
+                family, host = await self._get_dst_addr()
                 host_bytes = socket.inet_aton(host)
 
         # build and send connect command
@@ -254,7 +244,7 @@ class Socks4Protocol(BaseSocksProtocol):
         self.write_request(req)
 
         # read/process result
-        resp = yield from self.read_response(8)
+        resp = await self.read_response(8)
 
         if resp[0] != c.NULL:
             raise InvalidServerReply('SOCKS4 proxy server sent invalid data')
@@ -285,17 +275,16 @@ class Socks5Protocol(BaseSocksProtocol):
                          reader_limit=reader_limit,
                          negotiate_done_cb=negotiate_done_cb)
 
-    @asyncio.coroutine
-    def socks_request(self, cmd):
-        yield from self.authenticate()
+    async def socks_request(self, cmd):
+        await self.authenticate()
 
         # build and send command
-        dst_addr, resolved = yield from self.build_dst_address(
+        dst_addr, resolved = await self.build_dst_address(
             self._dst_host, self._dst_port)
         self.write_request([c.SOCKS_VER5, cmd, c.RSV] + dst_addr)
 
         # read/process command response
-        resp = yield from self.read_response(3)
+        resp = await self.read_response(3)
 
         if resp[0] != c.SOCKS_VER5:
             raise InvalidServerVersion(
@@ -305,12 +294,11 @@ class Socks5Protocol(BaseSocksProtocol):
             error = c.SOCKS5_ERRORS.get(resp[1], 'Unknown error')
             raise SocksError('[Errno {0:#04x}]: {1}'.format(resp[1], error))
 
-        binded = yield from self.read_address()
+        binded = await self.read_address()
 
         return resolved, binded
 
-    @asyncio.coroutine
-    def authenticate(self):
+    async def authenticate(self):
         # send available auth methods
         if self._auth.login and self._auth.password:
             req = [c.SOCKS_VER5, 0x02,
@@ -321,7 +309,7 @@ class Socks5Protocol(BaseSocksProtocol):
         self.write_request(req)
 
         # read/process response and send auth data if necessary
-        chosen_auth = yield from self.read_response(2)
+        chosen_auth = await self.read_response(2)
 
         if chosen_auth[0] != c.SOCKS_VER5:
             raise InvalidServerVersion(
@@ -333,7 +321,7 @@ class Socks5Protocol(BaseSocksProtocol):
                    chr(len(self._auth.password)).encode(), self._auth.password]
             self.write_request(req)
 
-            auth_status = yield from self.read_response(2)
+            auth_status = await self.read_response(2)
             if auth_status[0] != 0x01:
                 raise InvalidServerReply(
                     'SOCKS5 proxy server sent invalid data'
@@ -353,8 +341,7 @@ class Socks5Protocol(BaseSocksProtocol):
                     'SOCKS5 proxy server sent invalid data'
                 )
 
-    @asyncio.coroutine
-    def build_dst_address(self, host, port):
+    async def build_dst_address(self, host, port):
         family_to_byte = {socket.AF_INET: c.SOCKS5_ATYP_IPv4,
                           socket.AF_INET6: c.SOCKS5_ATYP_IPv6}
         port_bytes = struct.pack('>H', port)
@@ -375,29 +362,28 @@ class Socks5Protocol(BaseSocksProtocol):
             req = [c.SOCKS5_ATYP_DOMAIN, chr(len(host_bytes)).encode(),
                    host_bytes, port_bytes]
         else:
-            family, host_bytes = yield from self._get_dst_addr()
+            family, host_bytes = await self._get_dst_addr()
             host_bytes = socket.inet_pton(family, host_bytes)
             req = [family_to_byte[family], host_bytes, port_bytes]
             host = socket.inet_ntop(family, host_bytes)
 
         return req, (host, port)
 
-    @asyncio.coroutine
-    def read_address(self):
-        atype = yield from self.read_response(1)
+    async def read_address(self):
+        atype = await self.read_response(1)
 
         if atype[0] == c.SOCKS5_ATYP_IPv4:
-            addr = socket.inet_ntoa((yield from self.read_response(4)))
+            addr = socket.inet_ntoa((await self.read_response(4)))
         elif atype[0] == c.SOCKS5_ATYP_DOMAIN:
-            length = yield from self.read_response(1)
-            addr = yield from self.read_response(ord(length))
+            length = await self.read_response(1)
+            addr = await self.read_response(ord(length))
         elif atype[0] == c.SOCKS5_ATYP_IPv6:
-            addr = yield from self.read_response(16)
+            addr = await self.read_response(16)
             addr = socket.inet_ntop(socket.AF_INET6, addr)
         else:
             raise InvalidServerReply('SOCKS5 proxy server sent invalid data')
 
-        port = yield from self.read_response(2)
+        port = await self.read_response(2)
         port = struct.unpack('>H', port)[0]
 
         return addr, port
