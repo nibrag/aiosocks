@@ -12,7 +12,7 @@ __all__ = ('ProxyConnector', 'ProxyClientRequest')
 
 
 class ProxyClientRequest(aiohttp.ClientRequest):
-    def update_proxy(self, proxy, proxy_auth):
+    def update_proxy(self, proxy, proxy_auth, proxy_from_env):
         if proxy and proxy.scheme not in ['http', 'socks4', 'socks5']:
             raise ValueError(
                 "Only http, socks4 and socks5 proxies are supported")
