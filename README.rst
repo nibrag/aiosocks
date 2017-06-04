@@ -15,7 +15,7 @@ SOCKS proxy client for asyncio and aiohttp
 Dependencies
 ------------
 python 3.5+
-aiohttp 2.0+
+aiohttp 2.1+
 
 Features
 --------
@@ -185,3 +185,22 @@ aiohttp usage
     loop = asyncio.get_event_loop()
     loop.run_until_complete(load_github_main())
     loop.close()
+
+Proxy from environment
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+  import os
+  from aiosocks.connector import ProxyConnector, ProxyClientRequest
+
+  os.environ['socks4_proxy'] = 'socks4://127.0.0.1:333'
+  # or
+  os.environ['socks5_proxy'] = 'socks5://127.0.0.1:444'
+
+  conn = ProxyConnector()
+
+  with aiohttp.ClientSession(connector=conn, request_class=ProxyClientRequest) as session:
+        async with session.get('http://github.com/', proxy_from_env=True) as resp:
+          if resp.status == 200:
+            print(await resp.text())
