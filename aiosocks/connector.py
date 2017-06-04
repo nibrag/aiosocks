@@ -4,6 +4,9 @@ try:
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
 
+from yarl import URL
+from urllib.request import getproxies
+
 from .errors import SocksError, SocksConnectionError
 from .helpers import Socks4Auth, Socks5Auth, Socks4Addr, Socks5Addr
 from . import create_connection
@@ -12,7 +15,16 @@ __all__ = ('ProxyConnector', 'ProxyClientRequest')
 
 
 class ProxyClientRequest(aiohttp.ClientRequest):
-    def update_proxy(self, proxy, proxy_auth):
+    def update_proxy(self, proxy, proxy_auth, proxy_from_env):
+        if proxy_from_env and not proxy:
+            proxies = getproxies()
+
+            proxy_url = proxies.get(self.original_url.scheme)
+            if not proxy_url:
+                proxy_url = proxies.get('socks4') or proxies.get('socks5')
+
+            proxy = URL(proxy_url) if proxy_url else None
+
         if proxy and proxy.scheme not in ['http', 'socks4', 'socks5']:
             raise ValueError(
                 "Only http, socks4 and socks5 proxies are supported")
