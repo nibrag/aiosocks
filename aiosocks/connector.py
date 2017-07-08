@@ -76,7 +76,7 @@ class ProxyConnector(aiohttp.TCPConnector):
             sslcontext = None
 
         if not self._remote_resolve:
-            dst_hosts = await self._resolve_host(req.host, req.port)
+            dst_hosts = list(await self._resolve_host(req.host, req.port))
             dst = dst_hosts[0]['host'], dst_hosts[0]['port']
         else:
             dst = req.host, req.port
