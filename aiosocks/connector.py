@@ -15,7 +15,7 @@ __all__ = ('ProxyConnector', 'ProxyClientRequest')
 
 
 class ProxyClientRequest(aiohttp.ClientRequest):
-    def update_proxy(self, proxy, proxy_auth, proxy_from_env):
+    def update_proxy(self, proxy, proxy_auth, proxy_from_env=False):
         if proxy_from_env and not proxy:
             proxies = getproxies()
 
