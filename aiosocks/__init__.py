@@ -79,7 +79,7 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
 
     try:
         await waiter
-    except:
+    except:  # noqa
         transport.close()
         raise
 
