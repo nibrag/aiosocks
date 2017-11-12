@@ -8,7 +8,7 @@ from .helpers import (
 )
 from .protocols import Socks4Protocol, Socks5Protocol, DEFAULT_LIMIT
 
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
            'Socks5Auth', 'Socks4Addr', 'Socks5Addr', 'SocksError',
@@ -79,7 +79,7 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
 
     try:
         await waiter
-    except:
+    except:  # noqa
         transport.close()
         raise
 

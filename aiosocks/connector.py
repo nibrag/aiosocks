@@ -1,30 +1,24 @@
 try:
     import aiohttp
     from aiohttp.connector import sentinel
+    from aiohttp.client_exceptions import certificate_errors, ssl_errors
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
-
-from yarl import URL
-from urllib.request import getproxies
-
-from .errors import SocksError, SocksConnectionError
+from .errors import SocksConnectionError
 from .helpers import Socks4Auth, Socks5Auth, Socks4Addr, Socks5Addr
 from . import create_connection
 
 __all__ = ('ProxyConnector', 'ProxyClientRequest')
 
 
+from distutils.version import StrictVersion
+
+if StrictVersion(aiohttp.__version__) < StrictVersion('2.3.2'):
+    raise RuntimeError('aiosocks.connector depends on aiohttp 2.3.2+')
+
+
 class ProxyClientRequest(aiohttp.ClientRequest):
-    def update_proxy(self, proxy, proxy_auth, proxy_from_env):
-        if proxy_from_env and not proxy:
-            proxies = getproxies()
-
-            proxy_url = proxies.get(self.original_url.scheme)
-            if not proxy_url:
-                proxy_url = proxies.get('socks4') or proxies.get('socks5')
-
-            proxy = URL(proxy_url) if proxy_url else None
-
+    def update_proxy(self, proxy, proxy_auth, proxy_headers):
         if proxy and proxy.scheme not in ['http', 'socks4', 'socks5']:
             raise ValueError(
                 "Only http, socks4 and socks5 proxies are supported")
@@ -41,9 +35,9 @@ class ProxyClientRequest(aiohttp.ClientRequest):
                     not isinstance(proxy_auth, Socks5Auth):
                 raise ValueError("proxy_auth must be None or Socks5Auth() "
                                  "tuple for socks5 proxy")
-
         self.proxy = proxy
         self.proxy_auth = proxy_auth
+        self.proxy_headers = proxy_headers
 
 
 class ProxyConnector(aiohttp.TCPConnector):
@@ -69,20 +63,41 @@ class ProxyConnector(aiohttp.TCPConnector):
         else:
             return await self._create_socks_connection(req)
 
+    async def _wrap_create_socks_connection(self, *args, req, **kwargs):
+        try:
+            return await create_connection(*args, **kwargs)
+        except certificate_errors as exc:
+            raise aiohttp.ClientConnectorCertificateError(
+                req.connection_key, exc) from exc
+        except ssl_errors as exc:
+            raise aiohttp.ClientConnectorSSLError(
+                req.connection_key, exc) from exc
+        except (OSError, SocksConnectionError) as exc:
+            raise aiohttp.ClientProxyConnectionError(
+                req.connection_key, exc) from exc
+
     async def _create_socks_connection(self, req):
-        if req.ssl:
-            sslcontext = self.ssl_context
-        else:
-            sslcontext = None
+        sslcontext = self._get_ssl_context(req)
+        fingerprint, hashfunc = self._get_fingerprint_and_hashfunc(req)
 
         if not self._remote_resolve:
-            dst_hosts = list(await self._resolve_host(req.host, req.port))
-            dst = dst_hosts[0]['host'], dst_hosts[0]['port']
+            try:
+                dst_hosts = list(await self._resolve_host(req.host, req.port))
+                dst = dst_hosts[0]['host'], dst_hosts[0]['port']
+            except OSError as exc:
+                raise aiohttp.ClientConnectorError(
+                    req.connection_key, exc) from exc
         else:
             dst = req.host, req.port
 
-        proxy_hosts = await self._resolve_host(req.proxy.host, req.proxy.port)
-        exc = None
+        try:
+            proxy_hosts = await self._resolve_host(
+                req.proxy.host, req.proxy.port)
+        except OSError as exc:
+            raise aiohttp.ClientConnectorError(
+                req.connection_key, exc) from exc
+
+        last_exc = None
 
         for hinfo in proxy_hosts:
             if req.proxy.scheme == 'socks4':
@@ -91,45 +106,37 @@ class ProxyConnector(aiohttp.TCPConnector):
                 proxy = Socks5Addr(hinfo['host'], hinfo['port'])
 
             try:
-                transp, proto = await create_connection(
+                transp, proto = await self._wrap_create_socks_connection(
                     self._factory, proxy, req.proxy_auth, dst,
                     loop=self._loop, remote_resolve=self._remote_resolve,
                     ssl=sslcontext, family=hinfo['family'],
                     proto=hinfo['proto'], flags=hinfo['flags'],
-                    local_addr=self._local_addr,
+                    local_addr=self._local_addr, req=req,
                     server_hostname=req.host if sslcontext else None)
+            except aiohttp.ClientConnectorError as exc:
+                last_exc = exc
+                continue
 
-                self._validate_ssl_fingerprint(transp, req.host, req.port)
-                return transp, proto
-            except (OSError, SocksError, SocksConnectionError) as e:
-                exc = e
+            has_cert = transp.get_extra_info('sslcontext')
+            if has_cert and fingerprint:
+                sock = transp.get_extra_info('socket')
+                if not hasattr(sock, 'getpeercert'):
+                    # Workaround for asyncio 3.5.0
+                    # Starting from 3.5.1 version
+                    # there is 'ssl_object' extra info in transport
+                    sock = transp._ssl_protocol._sslpipe.ssl_object
+                # gives DER-encoded cert as a sequence of bytes (or None)
+                cert = sock.getpeercert(binary_form=True)
+                assert cert
+                got = hashfunc(cert).digest()
+                expected = fingerprint
+                if got != expected:
+                    transp.close()
+                    if not self._cleanup_closed_disabled:
+                        self._cleanup_closed_transports.append(transp)
+                    last_exc = aiohttp.ServerFingerprintMismatch(
+                        expected, got, req.host, req.port)
+                    continue
+            return transp, proto
         else:
-            if isinstance(exc, SocksConnectionError):
-                raise aiohttp.ClientProxyConnectionError(*exc.args)
-            if isinstance(exc, SocksError):
-                raise exc
-            else:
-                raise aiohttp.ClientOSError(
-                    exc.errno, 'Can not connect to %s:%s [%s]' %
-                               (req.host, req.port, exc.strerror)) from exc
-
-    def _validate_ssl_fingerprint(self, transp, host, port):
-        has_cert = transp.get_extra_info('sslcontext')
-        if has_cert and self._fingerprint:
-            sock = transp.get_extra_info('socket')
-            if not hasattr(sock, 'getpeercert'):
-                # Workaround for asyncio 3.5.0
-                # Starting from 3.5.1 version
-                # there is 'ssl_object' extra info in transport
-                sock = transp._ssl_protocol._sslpipe.ssl_object
-            # gives DER-encoded cert as a sequence of bytes (or None)
-            cert = sock.getpeercert(binary_form=True)
-            assert cert
-            got = self._hashfunc(cert).digest()
-            expected = self._fingerprint
-            if got != expected:
-                transp.close()
-                if not self._cleanup_closed_disabled:
-                    self._cleanup_closed_transports.append(transp)
-                raise aiohttp.ServerFingerprintMismatch(
-                    expected, got, host, port)
+            raise last_exc
