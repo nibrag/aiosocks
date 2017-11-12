@@ -1,16 +1,20 @@
-from aiohttp.client_exceptions import certificate_errors, ssl_errors
-
 try:
     import aiohttp
     from aiohttp.connector import sentinel
+    from aiohttp.client_exceptions import certificate_errors, ssl_errors
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
-
-from .errors import SocksError, SocksConnectionError
+from .errors import SocksConnectionError
 from .helpers import Socks4Auth, Socks5Auth, Socks4Addr, Socks5Addr
 from . import create_connection
 
 __all__ = ('ProxyConnector', 'ProxyClientRequest')
+
+
+from distutils.version import StrictVersion
+
+if StrictVersion(aiohttp.__version__) < StrictVersion('2.3.2'):
+    raise RuntimeError('aiosocks.connector depends on aiohttp 2.3.2+')
 
 
 class ProxyClientRequest(aiohttp.ClientRequest):
@@ -66,9 +70,11 @@ class ProxyConnector(aiohttp.TCPConnector):
             raise aiohttp.ClientConnectorCertificateError(
                 req.connection_key, exc) from exc
         except ssl_errors as exc:
-            raise aiohttp.ClientConnectorSSLError(req.connection_key, exc) from exc
+            raise aiohttp.ClientConnectorSSLError(
+                req.connection_key, exc) from exc
         except (OSError, SocksConnectionError) as exc:
-            raise aiohttp.ClientProxyConnectionError(req.connection_key, exc) from exc
+            raise aiohttp.ClientProxyConnectionError(
+                req.connection_key, exc) from exc
 
     async def _create_socks_connection(self, req):
         sslcontext = self._get_ssl_context(req)
@@ -79,14 +85,17 @@ class ProxyConnector(aiohttp.TCPConnector):
                 dst_hosts = list(await self._resolve_host(req.host, req.port))
                 dst = dst_hosts[0]['host'], dst_hosts[0]['port']
             except OSError as exc:
-                raise aiohttp.ClientConnectorError(req.connection_key, exc) from exc
+                raise aiohttp.ClientConnectorError(
+                    req.connection_key, exc) from exc
         else:
             dst = req.host, req.port
 
         try:
-            proxy_hosts = await self._resolve_host(req.proxy.host, req.proxy.port)
+            proxy_hosts = await self._resolve_host(
+                req.proxy.host, req.proxy.port)
         except OSError as exc:
-            raise aiohttp.ClientConnectorError(req.connection_key, exc) from exc
+            raise aiohttp.ClientConnectorError(
+                req.connection_key, exc) from exc
 
         last_exc = None
 
