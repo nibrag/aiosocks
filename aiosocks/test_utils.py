@@ -113,7 +113,7 @@ class FakeSocks4Srv:
                         data.append(byte[0])
                         writer.write(byte)
                         await writer.drain()
-                    except:
+                    except:  # noqa
                         break
 
         def factory():

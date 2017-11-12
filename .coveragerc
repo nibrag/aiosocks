@@ -1,7 +1,7 @@
 [run]
 branch = True
 source = aiosocks, tests
-omit = site-packages
+omit = site-packages,aiosocks/test_utils.py
 
 [html]
 directory = coverage
