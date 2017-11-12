@@ -9,22 +9,21 @@ from aiosocks.connector import ProxyConnector, ProxyClientRequest
 from aiosocks.helpers import Socks4Auth, Socks5Auth
 
 
-async def test_connect_proxy_ip():
+async def test_connect_proxy_ip(loop):
     tr, proto = mock.Mock(name='transport'), mock.Mock(name='protocol')
 
     with mock.patch('aiosocks.connector.create_connection',
                     make_mocked_coro((tr, proto))):
-        loop_mock = mock.Mock()
-        loop_mock.getaddrinfo = make_mocked_coro(
-            [[0, 0, 0, 0, ['127.0.0.1', 1080]]])
+        loop.getaddrinfo = make_mocked_coro(
+             [[0, 0, 0, 0, ['127.0.0.1', 1080]]])
 
         req = ProxyClientRequest(
-            'GET', URL('http://python.org'), loop=loop_mock,
+            'GET', URL('http://python.org'), loop=loop,
             proxy=URL('socks5://proxy.org'))
-        connector = ProxyConnector(loop=loop_mock)
+        connector = ProxyConnector(loop=loop)
         conn = await connector.connect(req)
 
-    assert loop_mock.getaddrinfo.called
+    assert loop.getaddrinfo.called
     assert conn.protocol is proto
 
     conn.close()
@@ -177,38 +176,3 @@ def test_proxy_client_request_invalid(loop):
             proxy=URL('socks5://proxy.org'), proxy_auth=Socks4Auth('l'))
     assert 'proxy_auth must be None or Socks5Auth() ' \
            'tuple for socks5 proxy' in str(cm)
-
-
-def test_proxy_from_env_http(loop):
-    proxies = {'http': 'http://proxy.org'}
-
-    with mock.patch('aiosocks.connector.getproxies',  return_value=proxies):
-        req = ProxyClientRequest('GET', URL('http://python.org'), loop=loop)
-        req.update_proxy(None, None, True)
-        assert req.proxy == URL('http://proxy.org')
-
-        req.original_url = URL('https://python.org')
-        req.update_proxy(None, None, True)
-        assert req.proxy is None
-
-        proxies.update({'https': 'http://proxy.org',
-                        'socks4': 'socks4://127.0.0.1:33',
-                        'socks5': 'socks5://localhost:44'})
-        req.update_proxy(None, None, True)
-        assert req.proxy == URL('http://proxy.org')
-
-
-def test_proxy_from_env_socks(loop):
-    proxies = {'socks4': 'socks4://127.0.0.1:33',
-               'socks5': 'socks5://localhost:44'}
-
-    with mock.patch('aiosocks.connector.getproxies', return_value=proxies):
-        req = ProxyClientRequest('GET', URL('http://python.org'), loop=loop)
-
-        req.update_proxy(None, None, True)
-        assert req.proxy == URL('socks4://127.0.0.1:33')
-
-        del proxies['socks4']
-
-        req.update_proxy(None, None, True)
-        assert req.proxy == URL('socks5://localhost:44')
