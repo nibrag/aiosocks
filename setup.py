@@ -19,8 +19,8 @@ with codecs.open(os.path.join(os.path.abspath(os.path.dirname(
         raise RuntimeError('Unable to determine version.')
 
 
-if sys.version_info < (3, 5, 0):
-    raise RuntimeError("aiosocks requires Python 3.5+")
+if sys.version_info < (3, 5, 3):
+    raise RuntimeError("aiosocks requires Python 3.5.3+")
 
 
 setup(

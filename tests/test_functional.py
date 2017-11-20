@@ -265,8 +265,12 @@ async def test_https_connect(loop):
     ws = RawTestServer(handler, scheme='https', host='127.0.0.1', loop=loop)
     await ws.start_server(loop=loop, ssl=sslcontext)
 
-    v_fp = b's\x93\xfd:\xed\x08\x1do\xa9\xaeq9\x1a\xe3\xc5\x7f\x89\xe7l\xf9'
-    inv_fp = b's\x93\xfd:\xed\x08\x1do\xa9\xaeq9\x1a\xe3\xc5\x7f\x89\xe7l\x10'
+    v_fp = (b'0\x9a\xc9D\x83\xdc\x91\'\x88\x91\x11\xa1d\x97\xfd'
+            b'\xcb~7U\x14D@L'
+            b'\x11\xab\x99\xa8\xae\xb7\x14\xee\x8b')
+    inv_fp = (b'0\x9d\xc9D\x83\xdc\x91\'\x88\x91\x11\xa1d\x97\xfd'
+              b'\xcb~7U\x14D@L'
+              b'\x11\xab\x99\xa8\xae\xb7\x14\xee\x9e')
 
     async with FakeSocks4Srv(loop) as srv:
         v_conn = ProxyConnector(loop=loop, remote_resolve=False,
