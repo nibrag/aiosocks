@@ -4,7 +4,7 @@ import pytest
 import socket
 import ssl as ssllib
 from unittest import mock
-from asyncio import coroutine as coro
+from asyncio import coroutine as coro, sslproto
 from aiohttp.test_utils import make_mocked_coro
 import aiosocks.constants as c
 from aiosocks.protocols import BaseSocksProtocol
@@ -272,10 +272,7 @@ async def test_base_make_ssl_proto():
     proto._transport = mock.Mock()
     await proto.negotiate(None, None)
 
-    mtr = loop_mock._make_ssl_transport
-
-    assert mtr.called
-    assert mtr.call_args[1]['sslcontext'] is ssl_context
+    assert isinstance(proto._transport, sslproto._SSLProtocolTransport)
 
 
 async def test_base_func_negotiate_cb_call():
