@@ -42,7 +42,7 @@ class ProxyClientRequest(aiohttp.ClientRequest):
 
 class ProxyConnector(aiohttp.TCPConnector):
     def __init__(self, *, verify_ssl=True, fingerprint=None,
-                 resolve=sentinel, use_dns_cache=True,
+                 resolve=sentinel, use_dns_cache=True, ttl_dns_cache=10,
                  family=0, ssl_context=None, local_addr=None,
                  resolver=None, keepalive_timeout=sentinel,
                  force_close=False, limit=100, limit_per_host=0,
@@ -53,6 +53,7 @@ class ProxyConnector(aiohttp.TCPConnector):
             resolver=resolver, keepalive_timeout=keepalive_timeout,
             force_close=force_close, limit=limit,  loop=loop,
             limit_per_host=limit_per_host, use_dns_cache=use_dns_cache,
+            ttl_dns_cache=ttl_dns_cache, 
             enable_cleanup_closed=enable_cleanup_closed)
 
         self._remote_resolve = remote_resolve
