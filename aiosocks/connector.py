@@ -11,12 +11,6 @@ from . import create_connection
 __all__ = ('ProxyConnector', 'ProxyClientRequest')
 
 
-from distutils.version import StrictVersion
-
-if StrictVersion(aiohttp.__version__) < StrictVersion('2.3.2'):
-    raise RuntimeError('aiosocks.connector depends on aiohttp 2.3.2+')
-
-
 class ProxyClientRequest(aiohttp.ClientRequest):
     def update_proxy(self, proxy, proxy_auth, proxy_headers):
         if proxy and proxy.scheme not in ['http', 'socks4', 'socks5']:

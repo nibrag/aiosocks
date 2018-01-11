@@ -33,5 +33,8 @@ setup(
 
         description='SOCKS proxy client for asyncio and aiohttp',
         long_description=open("README.rst").read(),
-        packages=['aiosocks']
+        packages=['aiosocks'],
+        install_requires=[
+            'aiohttp>=2.3.2',
+        ],
 )
