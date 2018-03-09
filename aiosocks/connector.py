@@ -4,6 +4,7 @@ try:
     from aiohttp.client_exceptions import certificate_errors, ssl_errors
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
+from hashlib import md5, sha1, sha256
 from .errors import SocksConnectionError
 from .helpers import Socks4Auth, Socks5Auth, Socks4Addr, Socks5Addr
 from . import create_connection
@@ -16,6 +17,12 @@ from distutils.version import StrictVersion
 if StrictVersion(aiohttp.__version__) < StrictVersion('2.3.2'):
     raise RuntimeError('aiosocks.connector depends on aiohttp 2.3.2+')
 
+
+HASHFUNC_BY_DIGESTLEN = {
+    16: md5,
+    20: sha1,
+    32: sha256,
+}
 
 class ProxyClientRequest(aiohttp.ClientRequest):
     def update_proxy(self, proxy, proxy_auth, proxy_headers):
@@ -41,25 +48,14 @@ class ProxyClientRequest(aiohttp.ClientRequest):
 
 
 class ProxyConnector(aiohttp.TCPConnector):
-    def __init__(self, *, verify_ssl=True, fingerprint=None,
-                 resolve=sentinel, use_dns_cache=True,
-                 family=0, ssl_context=None, local_addr=None,
-                 resolver=None, keepalive_timeout=sentinel,
-                 force_close=False, limit=100, limit_per_host=0,
-                 enable_cleanup_closed=False, loop=None, remote_resolve=True):
-        super().__init__(
-            verify_ssl=verify_ssl, fingerprint=fingerprint, resolve=resolve,
-            family=family, ssl_context=ssl_context, local_addr=local_addr,
-            resolver=resolver, keepalive_timeout=keepalive_timeout,
-            force_close=force_close, limit=limit,  loop=loop,
-            limit_per_host=limit_per_host, use_dns_cache=use_dns_cache,
-            enable_cleanup_closed=enable_cleanup_closed)
+    def __init__(self, remote_resolve=True, **kwargs):
+        super().__init__(**kwargs)
 
         self._remote_resolve = remote_resolve
 
-    async def _create_proxy_connection(self, req):
+    async def _create_proxy_connection(self, req, *args, **kwargs):
         if req.proxy.scheme == 'http':
-            return await super()._create_proxy_connection(req)
+            return await super()._create_proxy_connection(req, *args, **kwargs)
         else:
             return await self._create_socks_connection(req)
 
@@ -75,6 +71,28 @@ class ProxyConnector(aiohttp.TCPConnector):
         except (OSError, SocksConnectionError) as exc:
             raise aiohttp.ClientProxyConnectionError(
                 req.connection_key, exc) from exc
+
+    def _get_fingerprint_and_hashfunc(self, req):
+        base = super()
+        if hasattr(base, '_get_fingerprint_and_hashfunc'):
+            return base._get_fingerprint_and_hashfunc(req)
+
+        fingerprint = self._get_fingerprint(req)
+        if not fingerprint:
+            return (None, None)
+
+        hashfunc = getattr(fingerprint, '_hashfunc', None)
+        if hashfunc:
+            return (fingerprint, hashfunc)
+
+        digestlen = len(fingerprint)
+        hashfunc = HASHFUNC_BY_DIGESTLEN.get(digestlen)
+        if not hashfunc:
+            raise ValueError('fingerprint has invalid length')
+        elif hashfunc is md5 or hashfunc is sha1:
+            raise ValueError('md5 and sha1 are insecure and '
+                             'not supported. Use sha256.')
+        return (fingerprint, hashfunc)
 
     async def _create_socks_connection(self, req):
         sslcontext = self._get_ssl_context(req)
