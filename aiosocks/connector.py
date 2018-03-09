@@ -1,6 +1,5 @@
 try:
     import aiohttp
-    from aiohttp.connector import sentinel
     from aiohttp.client_exceptions import certificate_errors, ssl_errors
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
