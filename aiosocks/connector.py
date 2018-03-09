@@ -4,7 +4,6 @@ try:
     from aiohttp.client_exceptions import certificate_errors, ssl_errors
 except ImportError:
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
-from hashlib import md5, sha1, sha256
 from .errors import SocksConnectionError
 from .helpers import Socks4Auth, Socks5Auth, Socks4Addr, Socks5Addr
 from . import create_connection
@@ -17,12 +16,6 @@ from distutils.version import StrictVersion
 if StrictVersion(aiohttp.__version__) < StrictVersion('2.3.2'):
     raise RuntimeError('aiosocks.connector depends on aiohttp 2.3.2+')
 
-
-HASHFUNC_BY_DIGESTLEN = {
-    16: md5,
-    20: sha1,
-    32: sha256,
-}
 
 class ProxyClientRequest(aiohttp.ClientRequest):
     def update_proxy(self, proxy, proxy_auth, proxy_headers):
@@ -78,21 +71,10 @@ class ProxyConnector(aiohttp.TCPConnector):
             return base._get_fingerprint_and_hashfunc(req)
 
         fingerprint = self._get_fingerprint(req)
-        if not fingerprint:
-            return (None, None)
+        if fingerprint:
+            return (fingerprint.fingerprint, fingerprint._hashfunc)
 
-        hashfunc = getattr(fingerprint, '_hashfunc', None)
-        if hashfunc:
-            return (fingerprint.fingerprint, hashfunc)
-
-        digestlen = len(fingerprint.fingerprint)
-        hashfunc = HASHFUNC_BY_DIGESTLEN.get(digestlen)
-        if not hashfunc:
-            raise ValueError('fingerprint has invalid length')
-        elif hashfunc is md5 or hashfunc is sha1:
-            raise ValueError('md5 and sha1 are insecure and '
-                             'not supported. Use sha256.')
-        return (fingerprint.fingerprint, hashfunc)
+        return (None, None)
 
     async def _create_socks_connection(self, req):
         sslcontext = self._get_ssl_context(req)

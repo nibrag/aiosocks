@@ -1,3 +1,5 @@
+from distutils.version import StrictVersion
+
 import pytest
 import aiosocks
 import aiohttp
@@ -253,6 +255,8 @@ async def test_http_connect(loop):
 
 
 async def test_https_connect(loop):
+    aiohttp_major_version = StrictVersion(aiohttp.__version__).version[0]
+
     async def handler(request):
         return web.Response(text='Test message')
 
@@ -273,10 +277,16 @@ async def test_https_connect(loop):
               b'\x11\xab\x99\xa8\xae\xb7\x14\xee\x9e')
 
     async with FakeSocks4Srv(loop) as srv:
-        v_conn = ProxyConnector(loop=loop, remote_resolve=False,
-                                fingerprint=v_fp)
-        inv_conn = ProxyConnector(loop=loop, remote_resolve=False,
-                                  fingerprint=inv_fp)
+        if aiohttp_major_version == 2:
+            v_conn = ProxyConnector(loop=loop, remote_resolve=False,
+                                    verify_ssl=False, fingerprint=v_fp)
+            inv_conn = ProxyConnector(loop=loop, remote_resolve=False,
+                                      verify_ssl=False, fingerprint=inv_fp)
+        else:
+            v_conn = ProxyConnector(loop=loop, remote_resolve=False,
+                                    fingerprint=v_fp)
+            inv_conn = ProxyConnector(loop=loop, remote_resolve=False,
+                                      fingerprint=inv_fp)
 
         async with aiohttp.ClientSession(
                 connector=v_conn, loop=loop,
