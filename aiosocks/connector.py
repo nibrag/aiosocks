@@ -83,16 +83,16 @@ class ProxyConnector(aiohttp.TCPConnector):
 
         hashfunc = getattr(fingerprint, '_hashfunc', None)
         if hashfunc:
-            return (fingerprint, hashfunc)
+            return (fingerprint.fingerprint, hashfunc)
 
-        digestlen = len(fingerprint)
+        digestlen = len(fingerprint.fingerprint)
         hashfunc = HASHFUNC_BY_DIGESTLEN.get(digestlen)
         if not hashfunc:
             raise ValueError('fingerprint has invalid length')
         elif hashfunc is md5 or hashfunc is sha1:
             raise ValueError('md5 and sha1 are insecure and '
                              'not supported. Use sha256.')
-        return (fingerprint, hashfunc)
+        return (fingerprint.fingerprint, hashfunc)
 
     async def _create_socks_connection(self, req):
         sslcontext = self._get_ssl_context(req)
