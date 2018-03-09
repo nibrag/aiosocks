@@ -1,8 +1,9 @@
 try:
     import aiohttp
     from aiohttp.client_exceptions import certificate_errors, ssl_errors
-except ImportError:
+except ImportError:  # pragma: no cover
     raise ImportError('aiosocks.SocksConnector require aiohttp library')
+
 from .errors import SocksConnectionError
 from .helpers import Socks4Auth, Socks5Auth, Socks4Addr, Socks5Addr
 from . import create_connection
@@ -13,7 +14,9 @@ __all__ = ('ProxyConnector', 'ProxyClientRequest')
 from distutils.version import StrictVersion
 
 if StrictVersion(aiohttp.__version__) < StrictVersion('2.3.2'):
-    raise RuntimeError('aiosocks.connector depends on aiohttp 2.3.2+')
+    raise RuntimeError(
+        'aiosocks.connector depends on aiohttp 2.3.2+'
+    )  # pragma: no cover
 
 
 class ProxyClientRequest(aiohttp.ClientRequest):
