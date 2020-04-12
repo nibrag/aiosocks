@@ -92,7 +92,8 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
                 res = self._negotiate_done_cb(reader, writer)
 
                 if asyncio.iscoroutine(res):
-                    asyncio.Task(res, loop=self._loop)
+                    self._loop.create_task(res)
+                    return res
 
     def connection_made(self, transport):
         # connection_made is called

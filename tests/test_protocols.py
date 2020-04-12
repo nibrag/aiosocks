@@ -297,10 +297,8 @@ async def test_base_coro_negotiate_cb_call():
     proto.socks_request = make_mocked_coro((None, None))
     proto._negotiate_done_cb = make_mocked_coro(None)
 
-    with mock.patch('aiosocks.protocols.asyncio.Task') as task_mock:
-        await proto.negotiate(None, None)
-        assert proto._negotiate_done_cb.called
-        assert task_mock.called
+    await (await proto.negotiate(None, None))
+    assert proto._negotiate_done_cb.called
 
 
 async def test_base_reader_limit(loop):

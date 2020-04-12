@@ -1,3 +1,4 @@
+import asyncio
 import ssl
 
 import aiosocks
@@ -6,7 +7,7 @@ import pytest
 from yarl import URL
 from unittest import mock
 from aiohttp.test_utils import make_mocked_coro
-from aiohttp import BasicAuth
+from aiohttp import BasicAuth, ClientTimeout
 from aiosocks.connector import ProxyConnector, ProxyClientRequest
 from aiosocks.helpers import Socks4Auth, Socks5Auth
 
@@ -23,7 +24,7 @@ async def test_connect_proxy_ip(loop):
             'GET', URL('http://python.org'), loop=loop,
             proxy=URL('socks5://proxy.org'))
         connector = ProxyConnector(loop=loop)
-        conn = await connector.connect(req)
+        conn = await connector.connect(req, [], ClientTimeout())
 
     assert loop.getaddrinfo.called
     assert conn.protocol is proto
@@ -44,7 +45,7 @@ async def test_connect_proxy_domain():
         connector = ProxyConnector(loop=loop_mock)
 
         connector._resolve_host = make_mocked_coro([mock.MagicMock()])
-        conn = await connector.connect(req)
+        conn = await connector.connect(req, [], ClientTimeout())
 
     assert connector._resolve_host.call_count == 1
     assert conn.protocol is proto
@@ -62,8 +63,7 @@ async def test_connect_remote_resolve(loop):
             proxy=URL('socks5://127.0.0.1'))
         connector = ProxyConnector(loop=loop, remote_resolve=True)
         connector._resolve_host = make_mocked_coro([mock.MagicMock()])
-
-        conn = await connector.connect(req)
+        conn = await connector.connect(req, [], ClientTimeout())
 
     assert connector._resolve_host.call_count == 1
     assert conn.protocol is proto
@@ -81,8 +81,7 @@ async def test_connect_locale_resolve(loop):
             proxy=URL('socks5://proxy.example'))
         connector = ProxyConnector(loop=loop, remote_resolve=False)
         connector._resolve_host = make_mocked_coro([mock.MagicMock()])
-
-        conn = await connector.connect(req)
+        conn = await connector.connect(req, [], ClientTimeout())
 
     assert connector._resolve_host.call_count == 2
     assert conn.protocol is proto
@@ -103,7 +102,7 @@ async def test_resolve_host_fail(loop, remote_resolve):
         connector._resolve_host = make_mocked_coro(raise_exception=OSError())
 
         with pytest.raises(aiohttp.ClientConnectorError):
-            await connector.connect(req)
+            await connector.connect(req, [], ClientTimeout())
 
 
 @pytest.mark.parametrize('exc', [
@@ -124,7 +123,7 @@ async def test_proxy_connect_fail(loop, exc):
         connector = ProxyConnector(loop=loop_mock)
 
         with pytest.raises(exc[1]):
-            await connector.connect(req)
+            await connector.connect(req, [], ClientTimeout())
 
 
 async def test_proxy_negotiate_fail(loop):
@@ -140,7 +139,7 @@ async def test_proxy_negotiate_fail(loop):
         connector = ProxyConnector(loop=loop_mock)
 
         with pytest.raises(aiosocks.SocksError):
-            await connector.connect(req)
+            await connector.connect(req, [], ClientTimeout())
 
 
 async def test_proxy_connect_http(loop):
@@ -149,13 +148,17 @@ async def test_proxy_connect_http(loop):
     loop_mock.getaddrinfo = make_mocked_coro([
         [0, 0, 0, 0, ['127.0.0.1', 1080]]])
     loop_mock.create_connection = make_mocked_coro((tr, proto))
+    loop_mock.create_task.return_value = asyncio.Task(
+        make_mocked_coro([
+            {'host': 'host', 'port': 80, 'family': 1,
+             'hostname': 'hostname', 'flags': 11, 'proto': 'proto'}])())
 
     req = ProxyClientRequest(
         'GET', URL('http://python.org'), loop=loop,
         proxy=URL('http://127.0.0.1'))
     connector = ProxyConnector(loop=loop_mock)
 
-    await connector.connect(req)
+    await connector.connect(req, [], ClientTimeout())
 
 
 @pytest.mark.parametrize('proxy', [
