@@ -39,7 +39,7 @@ async def test_socks4_invalid_data(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'invalid data' in str(ct)
+        assert 'invalid data' in str(ct.value)
 
 
 async def test_socks4_srv_error(loop):
@@ -53,7 +53,7 @@ async def test_socks4_srv_error(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert '0x5b' in str(ct)
+        assert '0x5b' in str(ct.value)
 
 
 async def test_socks5_connect_success_anonymous(loop):
@@ -101,7 +101,7 @@ async def test_socks5_auth_ver_err(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'invalid version' in str(ct)
+        assert 'invalid version' in str(ct.value)
 
 
 async def test_socks5_auth_method_rejected(loop):
@@ -113,7 +113,7 @@ async def test_socks5_auth_method_rejected(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'authentication methods were rejected' in str(ct)
+        assert 'authentication methods were rejected' in str(ct.value)
 
 
 async def test_socks5_auth_status_invalid(loop):
@@ -125,7 +125,7 @@ async def test_socks5_auth_status_invalid(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'invalid data' in str(ct)
+        assert 'invalid data' in str(ct.value)
 
 
 async def test_socks5_auth_status_invalid2(loop):
@@ -137,7 +137,7 @@ async def test_socks5_auth_status_invalid2(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'invalid data' in str(ct)
+        assert 'invalid data' in str(ct.value)
 
 
 async def test_socks5_auth_failed(loop):
@@ -149,7 +149,7 @@ async def test_socks5_auth_failed(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'authentication failed' in str(ct)
+        assert 'authentication failed' in str(ct.value)
 
 
 async def test_socks5_cmd_ver_err(loop):
@@ -161,7 +161,7 @@ async def test_socks5_cmd_ver_err(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'invalid version' in str(ct)
+        assert 'invalid version' in str(ct.value)
 
 
 async def test_socks5_cmd_not_granted(loop):
@@ -173,7 +173,7 @@ async def test_socks5_cmd_not_granted(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'General SOCKS server failure' in str(ct)
+        assert 'General SOCKS server failure' in str(ct.value)
 
 
 async def test_socks5_invalid_address_type(loop):
@@ -185,7 +185,7 @@ async def test_socks5_invalid_address_type(loop):
         with pytest.raises(aiosocks.SocksError) as ct:
             await aiosocks.create_connection(
                 None, addr, auth, dst, loop=loop)
-        assert 'invalid data' in str(ct)
+        assert 'invalid data' in str(ct.value)
 
 
 async def test_socks5_atype_ipv4(loop):

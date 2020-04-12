@@ -12,38 +12,40 @@ async def test_create_connection_init():
     # proxy argument
     with pytest.raises(AssertionError) as ct:
         await aiosocks.create_connection(None, None, auth, dst)
-    assert 'proxy must be Socks4Addr() or Socks5Addr() tuple' in str(ct)
+    assert 'proxy must be Socks4Addr() or Socks5Addr() tuple' in str(ct.value)
 
     with pytest.raises(AssertionError) as ct:
         await aiosocks.create_connection(None, auth, auth, dst)
-    assert 'proxy must be Socks4Addr() or Socks5Addr() tuple' in str(ct)
+    assert 'proxy must be Socks4Addr() or Socks5Addr() tuple' in str(ct.value)
 
     # proxy_auth
     with pytest.raises(AssertionError) as ct:
         await aiosocks.create_connection(None, addr, addr, dst)
-    assert 'proxy_auth must be None or Socks4Auth()' in str(ct)
+    assert 'proxy_auth must be None or Socks4Auth()' in str(ct.value)
 
     # dst
     with pytest.raises(AssertionError) as ct:
         await aiosocks.create_connection(None, addr, auth, None)
-    assert 'invalid dst format, tuple("dst_host", dst_port))' in str(ct)
+    assert 'invalid dst format, tuple("dst_host", dst_port))' in str(ct.value)
 
     # addr and auth compatibility
     with pytest.raises(ValueError) as ct:
         await aiosocks.create_connection(
             None, addr, aiosocks.Socks4Auth(''), dst)
-    assert 'proxy is Socks5Addr but proxy_auth is not Socks5Auth' in str(ct)
+    assert 'proxy is Socks5Addr but proxy_auth is not Socks5Auth' \
+           in str(ct.value)
 
     with pytest.raises(ValueError) as ct:
         await aiosocks.create_connection(
             None, aiosocks.Socks4Addr(''), auth, dst)
-    assert 'proxy is Socks4Addr but proxy_auth is not Socks4Auth' in str(ct)
+    assert 'proxy is Socks4Addr but proxy_auth is not Socks4Auth' \
+           in str(ct.value)
 
     # test ssl, server_hostname
     with pytest.raises(ValueError) as ct:
         await aiosocks.create_connection(
             None, addr, auth, dst, server_hostname='python.org')
-    assert 'server_hostname is only meaningful with ssl' in str(ct)
+    assert 'server_hostname is only meaningful with ssl' in str(ct.value)
 
 
 async def test_connection_fail():
