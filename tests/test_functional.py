@@ -274,9 +274,9 @@ async def test_https_connect(loop):
 
     async with FakeSocks4Srv(loop) as srv:
         v_conn = ProxyConnector(loop=loop, remote_resolve=False,
-                                verify_ssl=False, fingerprint=v_fp)
+                                fingerprint=v_fp)
         inv_conn = ProxyConnector(loop=loop, remote_resolve=False,
-                                  verify_ssl=False, fingerprint=inv_fp)
+                                  fingerprint=inv_fp)
 
         async with aiohttp.ClientSession(
                 connector=v_conn, loop=loop,
