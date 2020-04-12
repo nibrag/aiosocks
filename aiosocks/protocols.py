@@ -19,8 +19,8 @@ DEFAULT_LIMIT = getattr(asyncio.streams, '_DEFAULT_LIMIT', 2**16)
 class BaseSocksProtocol(asyncio.StreamReaderProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter, *,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None, negotiate_done_cb=None,
-                 reader_limit=DEFAULT_LIMIT):
+                 server_hostname=None, ssl_handshake_timeout=None,
+                 negotiate_done_cb=None, reader_limit=DEFAULT_LIMIT):
         if not isinstance(dst, (tuple, list)) or len(dst) != 2:
             raise ValueError(
                 'Invalid dst format, tuple("dst_host", dst_port))'
@@ -33,6 +33,7 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
         self._waiter = waiter
         self._ssl = ssl
         self._server_hostname = server_hostname
+        self._ssl_handshake_timeout = ssl_handshake_timeout
         self._negotiate_done_cb = negotiate_done_cb
         self._loop = loop or asyncio.get_event_loop()
 
@@ -71,8 +72,10 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
                 # See details: http://bugs.python.org/issue23749
                 self._tls_protocol = sslproto.SSLProtocol(
                     app_protocol=self, sslcontext=self._ssl, server_side=False,
-                    server_hostname=self._server_hostname, waiter=self._waiter,
-                    loop=self._loop, call_connection_made=False)
+                    server_hostname=self._server_hostname,
+                    ssl_handshake_timeout=self._ssl_handshake_timeout,
+                    waiter=self._waiter, loop=self._loop,
+                    call_connection_made=False)
 
                 # starttls
                 original_transport = self._transport
@@ -204,7 +207,7 @@ class BaseSocksProtocol(asyncio.StreamReaderProtocol):
 class Socks4Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None, negotiate_done_cb=None,
+                 server_hostname=None, ssl_handshake_timeout=None, negotiate_done_cb=None,
                  reader_limit=DEFAULT_LIMIT):
         proxy_auth = proxy_auth or Socks4Auth('')
 
@@ -217,6 +220,7 @@ class Socks4Protocol(BaseSocksProtocol):
         super().__init__(proxy, proxy_auth, dst, app_protocol_factory,
                          waiter, remote_resolve=remote_resolve, loop=loop,
                          ssl=ssl, server_hostname=server_hostname,
+                         ssl_handshake_timeout=ssl_handshake_timeout,
                          reader_limit=reader_limit,
                          negotiate_done_cb=negotiate_done_cb)
 
@@ -261,7 +265,7 @@ class Socks4Protocol(BaseSocksProtocol):
 class Socks5Protocol(BaseSocksProtocol):
     def __init__(self, proxy, proxy_auth, dst, app_protocol_factory, waiter,
                  remote_resolve=True, loop=None, ssl=False,
-                 server_hostname=None, negotiate_done_cb=None,
+                 server_hostname=None, ssl_handshake_timeout=None, negotiate_done_cb=None,
                  reader_limit=DEFAULT_LIMIT):
         proxy_auth = proxy_auth or Socks5Auth('', '')
 
@@ -274,6 +278,7 @@ class Socks5Protocol(BaseSocksProtocol):
         super().__init__(proxy, proxy_auth, dst, app_protocol_factory,
                          waiter, remote_resolve=remote_resolve, loop=loop,
                          ssl=ssl, server_hostname=server_hostname,
+                         ssl_handshake_timeout=ssl_handshake_timeout,
                          reader_limit=reader_limit,
                          negotiate_done_cb=negotiate_done_cb)
 

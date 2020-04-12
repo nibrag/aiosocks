@@ -20,7 +20,7 @@ __all__ = ('Socks4Protocol', 'Socks5Protocol', 'Socks4Auth',
 async def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
                             remote_resolve=True, loop=None, ssl=None, family=0,
                             proto=0, flags=0, sock=None, local_addr=None,
-                            server_hostname=None, reader_limit=DEFAULT_LIMIT):
+                            server_hostname=None, ssl_handshake_timeout=None, reader_limit=DEFAULT_LIMIT):
     assert isinstance(proxy, SocksAddr), (
         'proxy must be Socks4Addr() or Socks5Addr() tuple'
     )
@@ -66,7 +66,7 @@ async def create_connection(protocol_factory, proxy, proxy_auth, dst, *,
                            app_protocol_factory=protocol_factory,
                            waiter=waiter, remote_resolve=remote_resolve,
                            loop=loop, ssl=ssl, server_hostname=server_hostname,
-                           reader_limit=reader_limit)
+                           ssl_handshake_timeout=ssl_handshake_timeout, reader_limit=reader_limit)
 
     try:
         transport, protocol = await loop.create_connection(
