@@ -24,7 +24,7 @@ install:
   - pip install pytest
   - pip install pytest-cov
   - pip install aiodns
-  - pip install aiohttp=2.0
+  - pip install aiohttp==2.0
   - pip install coveralls
 
 script:
