@@ -95,7 +95,7 @@ async def test_base_negotiate_os_error(loop):
 
     with pytest.raises(OSError) as ct:
         await waiter
-    assert 'test' in str(ct)
+    assert 'test' in str(ct.value)
 
 
 async def test_base_negotiate_socks_err(loop):
@@ -107,7 +107,7 @@ async def test_base_negotiate_socks_err(loop):
 
     with pytest.raises(aiosocks.SocksError) as ct:
         await waiter
-    assert 'Can not connect to' in str(ct)
+    assert 'Can not connect to' in str(ct.value)
 
 
 async def test_base_negotiate_without_app_proto(loop):
@@ -424,7 +424,7 @@ async def test_socks_err_resp_handling(loop):
 
     with pytest.raises(aiosocks.SocksError) as cm:
         await proto.socks_request(c.SOCKS_CMD_CONNECT)
-    assert '0x5b' in str(cm)
+    assert '0x5b' in str(cm.value)
 
 
 async def test_socks4_unknown_err_resp_handling(loop):
@@ -432,7 +432,7 @@ async def test_socks4_unknown_err_resp_handling(loop):
 
     with pytest.raises(aiosocks.SocksError) as cm:
         await proto.socks_request(c.SOCKS_CMD_CONNECT)
-    assert 'Unknown error' in str(cm)
+    assert 'Unknown error' in str(cm.value)
 
 
 def test_socks5_ctor(loop):
@@ -586,7 +586,7 @@ async def test_socks5_socks_req_socks_srv_err(loop):
 
     with pytest.raises(aiosocks.SocksError) as ct:
         await proto.socks_request(c.SOCKS_CMD_CONNECT)
-    assert 'Connection not allowed by ruleset' in str(ct)
+    assert 'Connection not allowed by ruleset' in str(ct.value)
 
 
 async def test_socks5_socks_req_unknown_err(loop):
@@ -594,7 +594,7 @@ async def test_socks5_socks_req_unknown_err(loop):
 
     with pytest.raises(aiosocks.SocksError) as ct:
         await proto.socks_request(c.SOCKS_CMD_CONNECT)
-    assert 'Unknown error' in str(ct)
+    assert 'Unknown error' in str(ct.value)
 
 
 async def test_socks_req_cmd_granted(loop):

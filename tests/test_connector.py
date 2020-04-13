@@ -179,25 +179,26 @@ def test_proxy_client_request_invalid(loop):
         ProxyClientRequest(
             'GET', URL('http://python.org'),
             proxy=URL('socks6://proxy.org'), proxy_auth=None, loop=loop)
-    assert 'Only http, socks4 and socks5 proxies are supported' in str(cm)
+    assert 'Only http, socks4 and socks5 proxies are supported' \
+           in str(cm.value)
 
     with pytest.raises(ValueError) as cm:
         ProxyClientRequest(
             'GET', URL('http://python.org'), loop=loop,
             proxy=URL('http://proxy.org'), proxy_auth=Socks4Auth('l'))
     assert 'proxy_auth must be None or BasicAuth() ' \
-           'tuple for http proxy' in str(cm)
+           'tuple for http proxy' in str(cm.value)
 
     with pytest.raises(ValueError) as cm:
         ProxyClientRequest(
             'GET', URL('http://python.org'), loop=loop,
             proxy=URL('socks4://proxy.org'), proxy_auth=BasicAuth('l'))
     assert 'proxy_auth must be None or Socks4Auth() ' \
-           'tuple for socks4 proxy' in str(cm)
+           'tuple for socks4 proxy' in str(cm.value)
 
     with pytest.raises(ValueError) as cm:
         ProxyClientRequest(
             'GET', URL('http://python.org'), loop=loop,
             proxy=URL('socks5://proxy.org'), proxy_auth=Socks4Auth('l'))
     assert 'proxy_auth must be None or Socks5Auth() ' \
-           'tuple for socks5 proxy' in str(cm)
+           'tuple for socks5 proxy' in str(cm.value)
